@@ -5,6 +5,7 @@ Functions to analyze a monte carlo (MC) or molecular dynamics (MD) trajectory.
 '''
 
 import numpy as np
+from math import sqrt
 from numba import jit
 
 @jit(nopython=True)
@@ -35,10 +36,6 @@ def get_mol_com(xyz, beads_per_mol, box_dims, img_flags, mass_data):
     # by having optional arguments, so that unwrapping and building of mol_data
     # is not done multiple times when going from get_mol -> calc_rg.
 
-    print(f'Calculating molecular center of mass data ...                    ', 
-          end='\r', 
-          flush=True)
-
     # Get simulation parameters from the arguments and preallocate arrays.
 
     nframes = xyz.shape[0]
@@ -53,16 +50,16 @@ def get_mol_com(xyz, beads_per_mol, box_dims, img_flags, mass_data):
         
         # Loop through each molecule.
 
+        mol_start = 0
         for mol_num in range(nmolec):
 
             # Find the starting bead number for this molecule and the next.
 
-            mol_start = mol_num * beads_per_mol[mol_num]
-            next_mol_start = (mol_num + 1) * beads_per_mol[mol_num]
-        
+            mol_end = beads_per_mol[mol_num] + mol_start 
+
             # Loop through each bead in the current molecule.
 
-            for bead_num in range(mol_start, next_mol_start):
+            for bead_num in range(mol_start, mol_end):
 
                 # Unwrap the bead's coordinates and find its mass. 
 
@@ -80,10 +77,10 @@ def get_mol_com(xyz, beads_per_mol, box_dims, img_flags, mass_data):
                 # Store the bead's unwrapped coordinates and mass with 
                 # other beads of the same molecule.
 
-                mol_data[0][bead_num - mol_num * beads_per_mol[mol_num]] = x
-                mol_data[1][bead_num - mol_num * beads_per_mol[mol_num]] = y
-                mol_data[2][bead_num - mol_num * beads_per_mol[mol_num]] = z
-                mol_data[3][bead_num - mol_num * beads_per_mol[mol_num]] = mass
+                mol_data[0][bead_num - mol_start] = x
+                mol_data[1][bead_num - mol_start] = y
+                mol_data[2][bead_num - mol_start] = z
+                mol_data[3][bead_num - mol_start] = mass
 
             # Calculate and store the molecule's center of mass.
 
@@ -95,7 +92,11 @@ def get_mol_com(xyz, beads_per_mol, box_dims, img_flags, mass_data):
             mol_com[frame][mol_num][1] = mass_weighted_y / total_mass
             mol_com[frame][mol_num][2] = mass_weighted_z / total_mass
 
-    print('Molecular center of mass data calculated.                         ') 
+            # Update for the next molecule.
+
+            mol_start = mol_end
+            mol_data.fill(0)
+
     return mol_com
 
 
@@ -126,16 +127,11 @@ def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mass_data):
     # TODO Better name than beads for particles? And are comments appropiate?
     # TODO Better name than rg_data?
 
-    print(f'Calculating radius of gyration data ...                          ', 
-          end='\r', 
-          flush=True)
-
     # Get simulation parameters from the arguments and preallocate arrays.
 
     nframes = xyz.shape[0]
     nmolec = beads_per_mol.shape[0]
     largest_mol = np.amax(beads_per_mol)
-    rg_sum = 0
     bead_xyz = np.zeros(3)
     rg_data = np.zeros((nframes, nmolec))
 
@@ -145,16 +141,17 @@ def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mass_data):
         
         # Loop through each molecule.
 
+        mol_start = 0
         for mol_num in range(nmolec):
 
             # Find the starting bead number for this molecule and the next.
 
-            mol_start = mol_num * beads_per_mol[mol_num]
-            next_mol_start = (mol_num + 1) * beads_per_mol[mol_num]
+            mol_end = beads_per_mol[mol_num] + mol_start
         
             # Loop through each bead in the current molecule.
 
-            for bead_num in range(mol_start, next_mol_start):
+            rg_sum = 0
+            for bead_num in range(mol_start, mol_end):
 
                 # Unwrap the bead's coordinates. 
 
@@ -176,7 +173,10 @@ def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mass_data):
             
             # Calculate the molecule's radius of gyration for the frame.
 
-            rg_data[frame][mol_num] = rg_sum / beads_per_mol[mol_num]
+            rg_data[frame][mol_num] = sqrt(rg_sum / beads_per_mol[mol_num])
 
-    print('Radius of gyration data calculated.                               ') 
+            # Update for the next molecule.
+
+            mol_start = mol_end 
+
     return rg_data
