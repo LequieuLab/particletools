@@ -24,7 +24,7 @@ def get_mol_com(xyz, beads_per_mol, box_dims, img_flags, mass_data):
                   y-dimension, and index 2 is the z-dimension.
         img_flags: the trajectory's image flags stored as a 3D numpy array ... 
                    (finish and test documentation later).
-        mass_data: me too!
+        mass_data: 1D numpy array of particle masses where the index is particle_ID.
 
     Returns:
         mol_com: and me!
@@ -116,7 +116,7 @@ def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mass_data):
                   y-dimension, and index 2 is the z-dimension.
         img_flags: the trajectory's image flags stored as a 3D numpy array ... 
                    (finish and test documentation later).
-        mass_data: me too!
+        mass_data: 1D numpy array of particle masses where the index is particle_ID.
         mol_com: now me!
 
     Returns:
