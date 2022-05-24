@@ -117,10 +117,12 @@ def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mass_data):
         img_flags: the trajectory's image flags stored as a 3D numpy array ... 
                    (finish and test documentation later).
         mass_data: 1D numpy array of particle masses where the index is particle_ID.
-        mol_com: now me!
+        mol_com: 2D numpy array with dimensions of frame and molecule ID, holds the
+                 value of the molecule's center of mass for a given frame.
 
     Returns:
-        calc_rg: and me!
+        calc_rg: 2D numpy array with dimensions of frame and molecule ID, holds the
+                 value of the molecule's radius of gyration for a given frame.
     """
 
     # TODO Finish and test docstring using Sphinx.
