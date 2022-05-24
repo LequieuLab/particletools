@@ -224,7 +224,7 @@ def bead_heatmap(xyz, bead_list, fixed_dim, rcut, nbins, box_dims, img_flags):
 
 
 @jit(nopython=True)
-def jit_get_image_flags(xyz, box_dims):
+def get_img_flags(xyz, box_dims):
     """
     Calculate the image flags of a trajectory. This assumes that the dump
     frequency is sufficiently high such that beads never travel more than half
