@@ -63,8 +63,33 @@ class TestAnalyzeFunctions(unittest.TestCase):
                                      test_img_flags)
         self.assertTrue((traj_unwrap == test_traj_unwrap).all())
 
-    # def test_get_mol_com(self):
+    def test_mol_com_from_frame(self):
         
+        # Define the positions, molecule IDs, and masses of particles.
+
+        test_pos =     [[  -1,   -1,    0],
+                        [ 2.5,  2.5,  2.5],
+                        [   0,    0,    0],
+                        [  -2,   -2,   -1],
+                        [ 3.6,  3.6,  3.6],
+                        [   5,    5,    5],
+                        [   0,    0,    1],
+                        [   1,    1,    0]]
+        test_molid =   [    5,    2,    2,    5,    0,    2,    5,    5]
+        test_mass =    [    1,   10,  3.5,    1,   69,  3.5,    1,    1]
+        test_mol_com = [[ 3.6,  3.6,  3.6],
+                        [ 2.5,  2.5,  2.5],
+                        [-0.5, -0.5,    0]]
+        test_pos = np.asarray(test_pos)
+        test_molid = np.asarray(test_molid)
+        test_mass = np.asarray(test_mass)
+        test_mol_com = np.asarray(test_mol_com)
+
+        # Test mol_com_from_frame to see if it returns the correct values.
+
+        mol_com = pt.mol_com_from_frame(test_pos, test_molid, test_mass)
+        self.assertTrue((mol_com == test_mol_com).all())
+
     # def test_calc_rg(self):
 
     # def test_profile_density(self):
