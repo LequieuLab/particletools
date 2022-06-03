@@ -4,16 +4,15 @@
 Functions to analyze a particle based trajectory.
 '''
 
-# TODO Go through and change mol_data to being [mol_num][dimension] for
-# consistency.
 # TODO Go through and change [x][y][z] notation to [x, y, z].
+# TODO Go through and change bead -> particle.
 
 import numpy as np
 from math import sqrt
 from numba import jit
 
 @jit(nopython=True)
-def img_flags_from_traj(p_wrap_traj, box_config):
+def img_flags_from_traj(traj_wrap, box_config):
     """
     Calculate the image flags of a wrapped particle-based trajectory. This 
     assumes that the dump frequency is sufficiently high such that beads never 
@@ -23,17 +22,17 @@ def img_flags_from_traj(p_wrap_traj, box_config):
     calculations. Assumes that the box dimensions are constant in time.
     
     Args:
-        p_wrap_traj: The wrapped trajectory of each particle stored as a 3D 
-                     numpy array with dimensions 'frame by particle number by 
-                     particle position (x, y, z)'.
+        traj_wrap: The wrapped trajectory of each particle stored as a 3D 
+                   numpy array with dimensions 'frame by particle ID by 
+                   particle position (x, y, z)'.
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz).
     Returns:
-        traj_img_flags: The image flags of the particles across the trajectory
-                        stored as a 3D numpy array with dimensions 'frame by 
-                        particle number by particle image flag (ix, iy, iz).
+        img_flags: The image flags of the particles across the trajectory
+                   stored as a 3D numpy array with dimensions 'frame by 
+                   particle ID by particle image flag (ix, iy, iz)'.
     """
 
     # TODO Expand to triclinic boxes.
@@ -42,70 +41,70 @@ def img_flags_from_traj(p_wrap_traj, box_config):
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
-    nframes = p_wrap_traj.shape[0]
-    nparticles = p_wrap_traj.shape[1]
+    nframes = traj_wrap.shape[0]
+    nparticles = traj_wrap.shape[1]
     lx, ly, lz = box_config[0:3]
-    traj_img_flags = np.zeros(p_wrap_traj.shape, dtype=np.int32)
+    img_flags = np.zeros(traj_wrap.shape, dtype=np.int32)
 
     # Loop through each frame but the first, since changes in position between
     # frames are needed to calculate image flags.
 
     for frame in range(1, nframes):
 
-        # Loop through each particle.
+        # Loop through each particle's index (index = ID - 1).
 
-        for p_num in range(nparticles):
+        for p_idx in range(nparticles):
 
-            # Get the bead's change in position from the last frame
+            # Get the particle's change in position from the last frame
 
-            del_x = p_wrap_traj[frame, p_num, 0] -\
-                    p_wrap_traj[frame - 1, p_num, 0]
-            del_y = p_wrap_traj[frame, p_num, 1] -\
-                    p_wrap_traj[frame - 1, p_num, 1]
-            del_z = p_wrap_traj[frame, p_num, 2] -\
-                    p_wrap_traj[frame - 1, p_num, 2]
+            del_x = traj_wrap[frame, p_idx, 0] -\
+                    traj_wrap[frame - 1, p_idx, 0]
+            del_y = traj_wrap[frame, p_idx, 1] -\
+                    traj_wrap[frame - 1, p_idx, 1]
+            del_z = traj_wrap[frame, p_idx, 2] -\
+                    traj_wrap[frame - 1, p_idx, 2]
 
             # Store any periodic boundary crossings.
 
             if del_x > lx / 2:
-                traj_img_flags[frame:, p_num, 0] -= 1
+                img_flags[frame:, p_idx, 0] -= 1
             if del_y > ly / 2:
-                traj_img_flags[frame:, p_num, 1] -= 1
+                img_flags[frame:, p_idx, 1] -= 1
             if del_z > lz / 2:
-                traj_img_flags[frame:, p_num, 2] -= 1
+                img_flags[frame:, p_idx, 2] -= 1
             if del_x < lx / -2:
-                traj_img_flags[frame:, p_num, 0] += 1
+                img_flags[frame:, p_idx, 0] += 1
             if del_y < ly / -2:
-                traj_img_flags[frame:, p_num, 1] += 1
+                img_flags[frame:, p_idx, 1] += 1
             if del_z < lz / -2:
-                traj_img_flags[frame:, p_num, 2] += 1
+                img_flags[frame:, p_idx, 2] += 1
 
     # Return the image flags.
 
-    return traj_img_flags
+    return img_flags
 
 
 @jit(nopython=True)
-def unwrap_traj(p_wrap_traj, box_config, traj_img_flags):
+def unwrap_traj(traj_wrap, box_config, img_flags):
     """
     Calculate the unwrapped trajectory of a particle-based trajectory using the
     trajectory's image flags and the simluation box configuration. Assumes that
     the box dimensions are constant in time.
     
     Args:
-        p_wrap_traj: The wrapped trajectory of each particle stored as a 3D 
-                     numpy array with dimensions 'frame by particle number by 
+        traj_wrap: The wrapped trajectory of each particle stored as a 3D 
+                     numpy array with dimensions 'frame by particle ID by 
                      particle position (x, y, z)'.
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz).
-        traj_img_flags: The image flags of the particles across the trajectory
+        img_flags: The image flags of the particles across the trajectory
                         stored as a 3D numpy array with dimensions 'frame by 
-                        particle number by particle image flag (ix, iy, iz).
+                        particle ID by particle image flag (ix, iy, iz).
     Returns:
-        p_unwrap_traj: The unwrapped trajectory of each particle stored as a 3D 
-                       numpy array with dimensions 'frame by particle number by 
+        traj_unwrap: The unwrapped trajectory of each particle stored as a 3D 
+                       numpy array with dimensions 'frame by particle ID by 
                        particle position (x, y, z)'.
     """
 
@@ -115,50 +114,47 @@ def unwrap_traj(p_wrap_traj, box_config, traj_img_flags):
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
-    nframes = p_wrap_traj.shape[0]
-    nparticles = p_wrap_traj.shape[1]
+    nframes = traj_wrap.shape[0]
+    nparticles = traj_wrap.shape[1]
     lx, ly, lz = box_config[0:3]
-    p_unwrap_traj = np.zeros(p_wrap_traj.shape)
+    traj_unwrap = np.zeros(traj_wrap.shape)
 
     # Loop through each frame. 
 
     for frame in range(nframes):
 
-        # Loop through each particle.
+        # Loop through each particle's index (index = ID - 1).
 
-        for p_num in range(nparticles):
+        for p_idx in range(nparticles):
 
             # Unwrap the particle's position based on the image flags and box
             # configuration.
 
-            p_unwrap_traj[frame, p_num, 0] = p_wrap_traj[frame, p_num, 0] +\
-                                             traj_img_flags[frame, p_num, 0] *\
-                                             lx
-            p_unwrap_traj[frame, p_num, 1] = p_wrap_traj[frame, p_num, 1] +\
-                                             traj_img_flags[frame, p_num, 1] *\
-                                             ly
-            p_unwrap_traj[frame, p_num, 2] = p_wrap_traj[frame, p_num, 2] +\
-                                             traj_img_flags[frame, p_num, 2] *\
-                                             lz
+            traj_unwrap[frame, p_idx, 0] = traj_wrap[frame, p_idx, 0] +\
+                                             img_flags[frame, p_idx, 0] * lx
+            traj_unwrap[frame, p_idx, 1] = traj_wrap[frame, p_idx, 1] +\
+                                             img_flags[frame, p_idx, 1] * ly
+            traj_unwrap[frame, p_idx, 2] = traj_wrap[frame, p_idx, 2] +\
+                                           img_flags[frame, p_idx, 2] * lz
 
     # Return the unwrapped trajectory.
 
-    return p_unwrap_traj
+    return traj_unwrap
 
 
 @jit(nopython=True)
-def mol_com_from_frame(p_pos, p_molid, p_mass):
+def mol_com_from_frame(pos, molid, mass):
     """
     Calculate the center of mass for each molecule for a single frame of a 
     trajectory.
     
     Args:
-        p_pos: The position of each particle stored as a 2D numpy array with
-               dimensions 'particle number by particle position (x, y, z)'.
-        p_molid: The molecule ID of each particle stored as a 2D numpy array 
-                 with dimensions 'particle number by molecule ID'.
-        p_mass: The mass of each particle stored as a 2D numpy array with 
-                dimensions 'particle number by particle mass'.
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID by particle position (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 3D numpy array with
+               dimensions 'particle ID by molecule ID'.
+        mass: The mass of each particle stored as a 2D numpy array with
+              dimensions 'particle ID by particle mass'.
 
     Returns:
         frame_mol_com: The center of mass of each molecule stored as a 2D numpy
@@ -166,66 +162,23 @@ def mol_com_from_frame(p_pos, p_molid, p_mass):
                        mass'.
     """
 
-    # Get simulation parameters from the arguments and preallocate arrays.
+    # Preallocate the frame_mol_com array.
 
-    nframes = xyz.shape[0]
-    nmolec = beads_per_mol.shape[0]
-    largest_mol = np.amax(beads_per_mol)
-    mol_data = np.zeros((4, largest_mol))
     mol_com = np.zeros((nframes, nmolec, 3))
 
-    # Loop through each frame.
+    # Find the particle indices corresponding to each molecule ID.
 
-    for frame in range(nframes):
-        
-        # Loop through each molecule.
+    mol_ids = np.unique(p_molid)
+    # for mol_id in mol_ids:
 
-        mol_start = 0
-        for mol_num in range(nmolec):
 
-            # Find the starting bead number for this molecule and the next.
+    # TODO Construct the loop such that it knows from p_molid. Slices and sums
+    # the numpy array without building and resesting sums.
 
-            mol_end = beads_per_mol[mol_num] + mol_start 
+    
 
-            # Loop through each bead in the current molecule.
 
-            for bead_num in range(mol_start, mol_end):
-
-                # Unwrap the bead's coordinates and find its mass. 
-
-                x = xyz[frame][bead_num][0] +\
-                    np.sum(img_flags[:frame + 1, bead_num, 0]) *\
-                    box_dims[0]
-                y = xyz[frame][bead_num][1] +\
-                    np.sum(img_flags[:frame + 1, bead_num, 1]) *\
-                    box_dims[1]
-                z = xyz[frame][bead_num][2] +\
-                    np.sum(img_flags[:frame + 1, bead_num, 2]) *\
-                    box_dims[2]
-                mass = mdata[bead_num]
-
-                # Store the bead's unwrapped coordinates and mass with 
-                # other beads of the same molecule.
-
-                mol_data[0][bead_num - mol_start] = x
-                mol_data[1][bead_num - mol_start] = y
-                mol_data[2][bead_num - mol_start] = z
-                mol_data[3][bead_num - mol_start] = mass
-
-            # Calculate and store the molecule's center of mass.
-
-            mass_weighted_x = np.sum(mol_data[0] * mol_data[3])
-            mass_weighted_y = np.sum(mol_data[1] * mol_data[3])
-            mass_weighted_z = np.sum(mol_data[2] * mol_data[3])
-            total_mass = np.sum(mol_data[3])
-            mol_com[frame][mol_num][0] = mass_weighted_x / total_mass
-            mol_com[frame][mol_num][1] = mass_weighted_y / total_mass
-            mol_com[frame][mol_num][2] = mass_weighted_z / total_mass
-
-            # Update for the next molecule.
-
-            mol_start = mol_end
-            mol_data.fill(0)
+    # Return the molecules' center of masses.
 
     return mol_com
 
@@ -237,10 +190,10 @@ def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mdata):
     
     Args:
         xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-             the dimensions are (in order) simulation frame, atom number, and
+             the dimensions are (in order) simulation frame, atom ID, and
              xyz coordinates.
-        beads_per_mol: the number of particles per molecule stored as a 1D
-                       numpy array where the index equals the molecule number.
+        beads_per_mol: the ID of particles per molecule stored as a 1D
+                       numpy array where the index equals the molecule ID.
         box_dims: the xyz values of the simulation box stored as a 1D numpy
                   array, where index 0 is the x-dimension, index 1 is the
                   y-dimension, and index 2 is the z-dimension.
@@ -275,7 +228,7 @@ def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mdata):
         mol_start = 0
         for mol_num in range(nmolec):
 
-            # Find the starting bead number for this molecule and the next.
+            # Find the starting bead ID for this molecule and the next.
 
             mol_end = beads_per_mol[mol_num] + mol_start
         
@@ -488,7 +441,7 @@ def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
                     print('Error: invalid bin index created.')
                 beads_per_bin[sec_num][bin_idx] += 1
 
-        # If a section is reached, increment the section number.
+        # If a section is reached, increment the section ID.
 
         if (frame - frame_start + 1) % frames_per_sec == 0:
             sec_num += 1
@@ -513,13 +466,13 @@ def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
 #     
 #     Args:
 #         xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-#              the dimensions are (in order) simulation frame, atom number, and
+#              the dimensions are (in order) simulation frame, atom ID, and
 #              xyz coordinates.
 #         bead_list: 1D numpy array with the index of every bead of interest.
 #         fixed_dim: Dimension to not allow rij to rotate in. Either x, y, or z.
 #                    In the rij vector, it sets that dimension's component to 0.
 #         rcut: maximum length for the rij vector.
-#         nbins: number of bins for a dimension of the rij vector.
+#         nbins: ID of bins for a dimension of the rij vector.
 #         box_dims: the xyz values of the simulation box stored as a 1D numpy
 #                   array, where index 0 is the x-dimension, index 1 is the
 #                   y-dimension, and index 2 is the z-dimension.
