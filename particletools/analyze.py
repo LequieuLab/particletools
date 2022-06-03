@@ -6,40 +6,45 @@ Functions to analyze a particle based trajectory.
 
 # TODO Go through and change mol_data to being [mol_num][dimension] for
 # consistency.
-# TODO Go through and change [x][y][z] notation to [x, y, z]. 
+# TODO Go through and change [x][y][z] notation to [x, y, z].
 
 import numpy as np
 from math import sqrt
 from numba import jit
 
 @jit(nopython=True)
-def get_img_flags(xyz, box_dims):
+def get_img_flags(p_traj, box_config):
     """
-    Calculate the image flags of a trajectory. This assumes that the dump
-    frequency is sufficiently high such that beads never travel more than half
-    the length of a box dimension.
+    Calculate the image flags of a particle-based trajectory. This assumes that
+    the dump frequency is sufficiently high such that beads never travel more 
+    than half the length of a box dimension, otherwise image flags may be 
+    incorrect. Molecules that are spread across a periodic boundary will have 
+    incorrect image flags, potentially introducing errors in other 
+    calculations. Assumes that the box dimensions are constant in time.
     
     Args:
-        xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-             the dimensions are (in order) simulation frame, atom number, and
-             xyz coordinates.
-        box_dims: the xyz values of the simulation box stored as a 1D numpy
-                  array, where index 0 is the x-dimension, index 1 is the
-                  y-dimension, and index 2 is the z-dimension.
+        p_traj: The trajectory of each particle stored as a 3D numpy array with
+                dimensions 'frame by particle number by particle position 
+                (x, y, z)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz).
     Returns:
-        img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-                   (finish and test documentation later).
+        img_flags: The image flags of the particles stored as a 3D numpy array
+                   with dimensions 'frame by particle number by particle image
+                   flag (ix, iy, iz).
     """
 
-    # TODO Change the convention for image flags (make it cumulative sum).
-    # TODO Change the data type of img_flags and make it numba friendly,
-    # np.zeros(xyz.shape, dtype=int) does not work.
+    # TODO Expand to triclinic boxes.
+    # TODO Expand to non-constant box dimensions.
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
-    nframes = xyz.shape[0]
-    nbeads = xyz.shape[1]
-    img_flags = np.zeros(xyz.shape)
+    nframes = p_traj.shape[0]
+    nparticles = p_traj.shape[1]
+    lx, ly, lz = box_config[0:3]
+    img_flags = np.zeros(p_traj.shape, dtype=np.int32)
 
     # Loop through each frame but the first, since changes in position between
     # frames are needed to calculate image flags.
@@ -48,28 +53,28 @@ def get_img_flags(xyz, box_dims):
 
         # Loop through each bead.
 
-        for bead_num in range(nbeads):
+        for p_num in range(nparticles):
 
             # Get the bead's change in position from the last frame
 
-            del_x = xyz[frame][bead_num][0] - xyz[frame - 1][bead_num][0]
-            del_y = xyz[frame][bead_num][1] - xyz[frame - 1][bead_num][1]
-            del_z = xyz[frame][bead_num][2] - xyz[frame - 1][bead_num][2]
+            del_x = p_traj[frame, p_num, 0] - p_traj[frame - 1, p_num, 0]
+            del_y = p_traj[frame, p_num, 1] - p_traj[frame - 1, p_num, 1]
+            del_z = p_traj[frame, p_num, 2] - p_traj[frame - 1, p_num, 2]
 
             # Store any periodic boundary crossings.
 
-            if del_x > box_dims[0] / 2:
-                img_flags[frame][bead_num][0] -= 1
-            if del_y > box_dims[1] / 2:
-                img_flags[frame][bead_num][1] -= 1
-            if del_z > box_dims[2] / 2:
-                img_flags[frame][bead_num][2] -= 1
-            if del_x < box_dims[0] / -2:
-                img_flags[frame][bead_num][0] += 1
-            if del_y < box_dims[1] / -2:
-                img_flags[frame][bead_num][1] += 1
-            if del_z < box_dims[2] / -2:
-                img_flags[frame][bead_num][2] += 1
+            if del_x > lx / 2:
+                img_flags[frame:, p_num, 0] -= 1
+            if del_y > ly / 2:
+                img_flags[frame:, p_num, 1] -= 1
+            if del_z > lz / 2:
+                img_flags[frame:, p_num, 2] -= 1
+            if del_x < lx / -2:
+                img_flags[frame:, p_num, 0] += 1
+            if del_y < ly / -2:
+                img_flags[frame:, p_num, 1] += 1
+            if del_z < lz / -2:
+                img_flags[frame:, p_num, 2] += 1
 
     # Return the image flags.
 

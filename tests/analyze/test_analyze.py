@@ -3,23 +3,35 @@
 import unittest
 import particletools as pt
 import numpy as np
-import mdtraj as md
+from math import ceil
 
 class TestAnalyzeFunctions(unittest.TestCase):
 
-    # def test_get_img_flags(self):
+    def test_get_img_flags(self):
+        
+        # Define an orthogonal simulation box configuration.
 
-    def test_get_mol_com(self):
-        xyz = np.load('box_xyz.npy')
-        beads_per_mol = np.load('box_beads_per_mol.npy')
-        box_dims = np.load('box_box_dims.npy')
-        img_flags = np.load('box_img_flags.npy')
-        mdata = np.load('box_mdata.npy')
-        mol_com = pt.get_mol_com(xyz, beads_per_mol, box_dims, img_flags, 
-                                 mdata)
-        test_mol_com = np.load('box_mol_com.npy')
-        error = np.abs(test_mol_com - mol_com)
-        self.assertTrue((error < 1e-6).all())
+        box_config = np.asarray([4, 6, 10, 0, 0, 0])
+
+        # Define a particle trajectory with known image flags.
+
+        test_p_traj = [   [[ -2,   3,   0], [  2,  -3,   3]],
+                          [[  1,  -2,   3], [ -2,   2, 4.5]],
+                          [[ -1,   1,  -2], [  1,  -2, 4.8]],
+                          [[  2,  -3, 0.5], [  0,  -1,  -4]]]          
+        test_img_flags = [[[  0,   0,   0], [  0,   0,   0]],
+                          [[ -1,   1,   0], [  1,  -1,   0]],
+                          [[ -1,   1,   0], [  0,   0,   0]],
+                          [[ -2,   2,   0], [  0,   0,   1]]]
+        test_p_traj = np.asarray(test_p_traj)
+        test_img_flags = np.asarray(test_img_flags, dtype=np.int32)
+
+        # Test get_img_flags to see if it returns the correct values.
+
+        img_flags = pt.get_img_flags(test_p_traj, box_config)
+        self.assertTrue((img_flags == test_img_flags).all())
+
+    # def test_get_mol_com(self):
         
     # def test_calc_rg(self):
 
