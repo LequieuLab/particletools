@@ -13,104 +13,158 @@ from math import sqrt
 from numba import jit
 
 @jit(nopython=True)
-def get_img_flags(p_traj, box_config):
+def img_flags_from_traj(p_wrap_traj, box_config):
     """
-    Calculate the image flags of a particle-based trajectory. This assumes that
-    the dump frequency is sufficiently high such that beads never travel more 
-    than half the length of a box dimension, otherwise image flags may be 
-    incorrect. Molecules that are spread across a periodic boundary will have 
-    incorrect image flags, potentially introducing errors in other 
+    Calculate the image flags of a wrapped particle-based trajectory. This 
+    assumes that the dump frequency is sufficiently high such that beads never 
+    travel more than half the length of a box dimension, otherwise image flags 
+    may be incorrect. Molecules that are spread across a periodic boundary will
+    have incorrect image flags, potentially introducing errors in other 
     calculations. Assumes that the box dimensions are constant in time.
     
     Args:
-        p_traj: The trajectory of each particle stored as a 3D numpy array with
-                dimensions 'frame by particle number by particle position 
-                (x, y, z)'.
+        p_wrap_traj: The wrapped trajectory of each particle stored as a 3D 
+                     numpy array with dimensions 'frame by particle number by 
+                     particle position (x, y, z)'.
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz).
     Returns:
-        img_flags: The image flags of the particles stored as a 3D numpy array
-                   with dimensions 'frame by particle number by particle image
-                   flag (ix, iy, iz).
+        traj_img_flags: The image flags of the particles across the trajectory
+                        stored as a 3D numpy array with dimensions 'frame by 
+                        particle number by particle image flag (ix, iy, iz).
     """
 
     # TODO Expand to triclinic boxes.
-    # TODO Expand to non-constant box dimensions.
+    # TODO Expand to non-constant box dimensions, though not sure how image
+    # flags would be packaged in that case.
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
-    nframes = p_traj.shape[0]
-    nparticles = p_traj.shape[1]
+    nframes = p_wrap_traj.shape[0]
+    nparticles = p_wrap_traj.shape[1]
     lx, ly, lz = box_config[0:3]
-    img_flags = np.zeros(p_traj.shape, dtype=np.int32)
+    traj_img_flags = np.zeros(p_wrap_traj.shape, dtype=np.int32)
 
     # Loop through each frame but the first, since changes in position between
     # frames are needed to calculate image flags.
 
     for frame in range(1, nframes):
 
-        # Loop through each bead.
+        # Loop through each particle.
 
         for p_num in range(nparticles):
 
             # Get the bead's change in position from the last frame
 
-            del_x = p_traj[frame, p_num, 0] - p_traj[frame - 1, p_num, 0]
-            del_y = p_traj[frame, p_num, 1] - p_traj[frame - 1, p_num, 1]
-            del_z = p_traj[frame, p_num, 2] - p_traj[frame - 1, p_num, 2]
+            del_x = p_wrap_traj[frame, p_num, 0] -\
+                    p_wrap_traj[frame - 1, p_num, 0]
+            del_y = p_wrap_traj[frame, p_num, 1] -\
+                    p_wrap_traj[frame - 1, p_num, 1]
+            del_z = p_wrap_traj[frame, p_num, 2] -\
+                    p_wrap_traj[frame - 1, p_num, 2]
 
             # Store any periodic boundary crossings.
 
             if del_x > lx / 2:
-                img_flags[frame:, p_num, 0] -= 1
+                traj_img_flags[frame:, p_num, 0] -= 1
             if del_y > ly / 2:
-                img_flags[frame:, p_num, 1] -= 1
+                traj_img_flags[frame:, p_num, 1] -= 1
             if del_z > lz / 2:
-                img_flags[frame:, p_num, 2] -= 1
+                traj_img_flags[frame:, p_num, 2] -= 1
             if del_x < lx / -2:
-                img_flags[frame:, p_num, 0] += 1
+                traj_img_flags[frame:, p_num, 0] += 1
             if del_y < ly / -2:
-                img_flags[frame:, p_num, 1] += 1
+                traj_img_flags[frame:, p_num, 1] += 1
             if del_z < lz / -2:
-                img_flags[frame:, p_num, 2] += 1
+                traj_img_flags[frame:, p_num, 2] += 1
 
     # Return the image flags.
 
-    return img_flags
+    return traj_img_flags
 
 
 @jit(nopython=True)
-def get_mol_com(xyz, beads_per_mol, box_dims, img_flags, mdata):
+def unwrap_traj(p_wrap_traj, box_config, traj_img_flags):
     """
-    Get the center of mass for each molecule at every frame of a trajectory.
+    Calculate the unwrapped trajectory of a particle-based trajectory using the
+    trajectory's image flags and the simluation box configuration. Assumes that
+    the box dimensions are constant in time.
     
     Args:
-        xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-             the dimensions are (in order) simulation frame, atom number, and
-             xyz coordinates.
-        beads_per_mol: the number of particles per molecule stored as a 1D
-                       numpy array where the index equals the molecule number.
-        box_dims: the xyz values of the simulation box stored as a 1D numpy
-                  array, where index 0 is the x-dimension, index 1 is the
-                  y-dimension, and index 2 is the z-dimension.
-        img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-                   (finish and test documentation later).
-        mdata: 1D numpy array of particle masses where the index is particle 
-               ID.
-
+        p_wrap_traj: The wrapped trajectory of each particle stored as a 3D 
+                     numpy array with dimensions 'frame by particle number by 
+                     particle position (x, y, z)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz).
+        traj_img_flags: The image flags of the particles across the trajectory
+                        stored as a 3D numpy array with dimensions 'frame by 
+                        particle number by particle image flag (ix, iy, iz).
     Returns:
-        mol_com: 2D numpy array with dimensions of frame and molecule ID, holds the
-                 value of the molecule's center of mass for a given frame.
+        p_unwrap_traj: The unwrapped trajectory of each particle stored as a 3D 
+                       numpy array with dimensions 'frame by particle number by 
+                       particle position (x, y, z)'.
     """
 
-    # TODO Finish and test docstring using Sphinx.
-    # TODO Better name than beads for particles? And are comments appropiate?
-    # TODO Importantly, there is a better way to structure these calculations
-    # by having optional arguments, so that unwrapping and building of mol_data
-    # is not done multiple times when going from get_mol -> calc_rg.
-    # TODO Make it so that it just takes coordinates, unwrapping done sep.
+    # TODO Expand to triclinic boxes.
+    # TODO Expand to non-constant box dimensions, though not sure how image
+    # flags would be packaged in that case.
+
+    # Get simulation parameters from the arguments and preallocate arrays.
+
+    nframes = p_wrap_traj.shape[0]
+    nparticles = p_wrap_traj.shape[1]
+    lx, ly, lz = box_config[0:3]
+    p_unwrap_traj = np.zeros(p_wrap_traj.shape)
+
+    # Loop through each frame. 
+
+    for frame in range(nframes):
+
+        # Loop through each particle.
+
+        for p_num in range(nparticles):
+
+            # Unwrap the particle's position based on the image flags and box
+            # configuration.
+
+            p_unwrap_traj[frame, p_num, 0] = p_wrap_traj[frame, p_num, 0] +\
+                                             traj_img_flags[frame, p_num, 0] *\
+                                             lx
+            p_unwrap_traj[frame, p_num, 1] = p_wrap_traj[frame, p_num, 1] +\
+                                             traj_img_flags[frame, p_num, 1] *\
+                                             ly
+            p_unwrap_traj[frame, p_num, 2] = p_wrap_traj[frame, p_num, 2] +\
+                                             traj_img_flags[frame, p_num, 2] *\
+                                             lz
+
+    # Return the unwrapped trajectory.
+
+    return p_unwrap_traj
+
+
+@jit(nopython=True)
+def mol_com_from_frame(p_pos, p_molid, p_mass):
+    """
+    Calculate the center of mass for each molecule for a single frame of a 
+    trajectory.
+    
+    Args:
+        p_pos: The position of each particle stored as a 2D numpy array with
+               dimensions 'particle number by particle position (x, y, z)'.
+        p_molid: The molecule ID of each particle stored as a 2D numpy array 
+                 with dimensions 'particle number by molecule ID'.
+        p_mass: The mass of each particle stored as a 2D numpy array with 
+                dimensions 'particle number by particle mass'.
+
+    Returns:
+        frame_mol_com: The center of mass of each molecule stored as a 2D numpy
+                       array with dimensions 'molecule ID by molecule center of
+                       mass'.
+    """
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
