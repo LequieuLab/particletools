@@ -146,7 +146,7 @@ def unwrap_traj(traj_wrap, box_config, img_flags):
 @jit(nopython=True)
 def mol_com_from_frame(pos, molid, mass):
     """
-    Calculate the center of mass for each molecule for a single frame of a 
+    Calculate the center of mass of each molecule for a single frame of their
     trajectory.
     
     Args:
@@ -186,6 +186,43 @@ def mol_com_from_frame(pos, molid, mass):
     # Return the molecules' center of masses.
 
     return mol_com
+
+
+@jit(nopython=True)
+def mol_com_from_traj(traj, molid, mass):
+    """
+    Calculate the center of mass of each molecule across their trajectory.
+    
+    Args:
+        traj: The trajectory of each particle stored as a 3D numpy array with
+              dimensions 'frame (ascending order) by particle ID (ascending 
+              order) by particle position (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimensions 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimensions 'particle ID (ascending order)'.
+
+    Returns:
+        traj_mol_com: The center of mass of each molecule across their 
+                      trajectory stored as a 2D numpy array with dimensions 
+                      'frame (ascending order) by molecule ID (ascending order)
+                      by molecule center of mass (x, y, z)'.
+    """
+
+    # Get simulation parameters from the arguments and preallocate arrays.
+    
+    nframes = traj.shape[0]
+    nmols = np.unique(molid).shape[0]
+    traj_mol_com = np.zeros((nframes, nmols, 3))
+
+    # Loop through each frame and get the center of mass of each molecule.
+
+    for frame in range(nframes):
+        traj_mol_com = mol_com_from_frame(traj[frame], molid, mass)
+
+    # Return the molecules' center of masses over the trajectory.
+
+    return traj_mol_com
 
 
 # @jit(nopython=True)

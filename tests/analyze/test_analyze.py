@@ -90,6 +90,8 @@ class TestAnalyzeFunctions(unittest.TestCase):
         mol_com = pt.mol_com_from_frame(test_pos, test_molid, test_mass)
         self.assertTrue((mol_com == test_mol_com).all())
 
+    # def test_mol_com_from_traj(self):
+
     # def test_calc_rg(self):
 
     # def test_profile_density(self):
