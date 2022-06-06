@@ -9,8 +9,13 @@ class TestAnalyzeFunctions(unittest.TestCase):
 
     def test_img_flags_from_traj(self):
         
-        # Define an orthogonal simulation box configuration.
+        # Define a random orthogonal simulation box configuration.
 
+        rng = np.random.default_rng()
+        lx, ly, lz = rng.random(size=3) * (100 - 1) + 1
+        print(lx)
+        print(ly)
+        print(lz)
         test_box_config = np.asarray([4, 6, 10, 0, 0, 0])
 
         # Define a wrapped particle-based trajectory with known image flags.
