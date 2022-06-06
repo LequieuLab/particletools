@@ -191,7 +191,9 @@ def mol_com_from_frame(pos, molid, mass):
 @jit(nopython=True)
 def mol_com_from_traj(traj, molid, mass):
     """
-    Calculate the center of mass of each molecule across their trajectory.
+    Calculate the center of mass of each molecule across their trajectory. The
+    trajectory can be either wrapped or unwrapped, but in most cases a wrapped
+    trajectory will provide biased results. 
     
     Args:
         traj: The trajectory of each particle stored as a 3D numpy array with
@@ -218,7 +220,7 @@ def mol_com_from_traj(traj, molid, mass):
     # Loop through each frame and get the center of mass of each molecule.
 
     for frame in range(nframes):
-        traj_mol_com = mol_com_from_frame(traj[frame], molid, mass)
+        traj_mol_com[frame] = mol_com_from_frame(traj[frame], molid, mass)
 
     # Return the molecules' center of masses over the trajectory.
 

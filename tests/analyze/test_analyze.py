@@ -4,18 +4,14 @@ import unittest
 import particletools as pt
 import numpy as np
 from math import ceil
+from numpy.random import default_rng
 
 class TestAnalyzeFunctions(unittest.TestCase):
 
     def test_img_flags_from_traj(self):
         
-        # Define a random orthogonal simulation box configuration.
+        # Define an orthogonal simulation box configuration.
 
-        rng = np.random.default_rng()
-        lx, ly, lz = rng.random(size=3) * (100 - 1) + 1
-        print(lx)
-        print(ly)
-        print(lz)
         test_box_config = np.asarray([4, 6, 10, 0, 0, 0])
 
         # Define a wrapped particle-based trajectory with known image flags.
@@ -70,7 +66,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
 
     def test_mol_com_from_frame(self):
         
-        # Define the positions, molecule IDs, and masses of particles.
+        # Define the positions, molecule IDs, and masses of the particles.
 
         test_pos =     [[  -1,   -1,    0],
                         [ 2.5,  2.5,  2.5],
@@ -95,7 +91,48 @@ class TestAnalyzeFunctions(unittest.TestCase):
         mol_com = pt.mol_com_from_frame(test_pos, test_molid, test_mass)
         self.assertTrue((mol_com == test_mol_com).all())
 
-    # def test_mol_com_from_traj(self):
+    def test_mol_com_from_traj(self):
+
+        # Define the trajectory, molecule IDs, and masses of the particles.
+     
+        test_traj =         [[[  10,   -4,   -2],
+                              [   9,   -3,   -1],
+                              [   8,   -2,    0],
+                              [   7,   -1,    1],
+                              [   6,    0,    2],
+                              [   1,    0,    1],
+                              [   1,    1,    1]],
+                             [[  10,    0,    4],
+                              [12.5,   -1,    5],
+                              [   5,   -3,    6],
+                              [  15,    1,    7],
+                              [17.5,    2,    8],
+                              [   1,  -10,  5.7],
+                              [   9,    2,  7.7]],
+                             [[   8,    2,    0],
+                              [   6,    2,    0],
+                              [   0,    2,    0],
+                              [  10,    2,    0],
+                              [   4,    2,    0],
+                              [  -5,    7,  100],
+                              [   5,    5,  -82]]]
+        test_molid =          [   1,    1,    1,    1,    1,   2,    2]
+        test_mass =           [   1,    1,    3,    1,    1,  10,   10]
+        test_traj_mol_com = [[[   8,   -2,    0],
+                              [   1,  0.5,    1]],
+                             [[  10,   -1,    6],
+                              [   5,   -4,  6.7]],
+                             [[   4,    2,    0],
+                              [   0,    6,    9]]]
+        test_traj = np.asarray(test_traj)
+        test_molid = np.asarray(test_molid)
+        test_mass = np.asarray(test_mass)
+        test_traj_mol_com = np.asarray(test_traj_mol_com)
+
+        # Test mol_com_from_frame to see if it returns the correct values.
+
+        traj_mol_com = pt.mol_com_from_traj(test_traj, test_molid, test_mass)
+        self.assertTrue((traj_mol_com == test_traj_mol_com).all())
 
     # def test_calc_rg(self):
 
