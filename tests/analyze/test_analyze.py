@@ -170,6 +170,57 @@ class TestAnalyzeFunctions(unittest.TestCase):
         rg = pt.rg_from_frame(test_pos, test_molid, test_mass, test_mol_com)
         self.assertTrue((rg == test_rg).all())
 
+    def test_rg_from_traj(self):
+        
+        # Define the trajectory, molecule IDs, and masses of the particles.
+
+        test_traj =    [[[   5,    5,  3.2],
+                         [   0,    0,    0],
+                         [  10,   -4,    6],
+                         [  -5,    0,    6],
+                         [   0,    0,    6],
+                         [   5,    0,    6]],
+                        [[ 4.5,  4.5,    7],
+                         [   6,   -2,    0],
+                         [  10,   -4,   10],
+                         [   0,   -5,    8],
+                         [   0,    0,    8],
+                         [   0,    5,    8]],
+                        [[   8,    9,    1],
+                         [  -1,   -1,   -1],
+                         [   1,    1,    1],
+                         [  -2,    0,    8],
+                         [   0,    1,    8],
+                         [   2,    2,    8]]]
+        test_molid =     [   1,    0,    0,    4,    4,    4]
+        test_mass =      [  75,    7,    7,    5,   50,    5]
+        test_traj = np.asarray(test_traj)
+        test_molid = np.asarray(test_molid)
+        test_mass = np.asarray(test_mass)
+
+        # Define the center of mass and radius of gyration for each molecule.
+
+        test_traj_mol_com = [[[   5,   -2,    3],
+                              [   5,    5,  3.2],
+                              [   0,    0,    6]],
+                             [[   8,   -3,    5],
+                              [ 4.5,  4.5,    7],
+                              [   0,    0,    8]],
+                             [[   0,    0,    0],
+                              [   8,    9,    1],
+                              [   0,    1,    8]]]
+        test_traj_rg = [[sqrt(38), 0, sqrt(50/3)],
+                        [sqrt(30), 0, sqrt(50/3)],
+                        [ sqrt(3), 0, sqrt(10/3)]]
+        test_traj_mol_com = np.asarray(test_traj_mol_com)
+        test_traj_rg = np.asarray(test_traj_rg)
+
+        # Test mol_com_from_traj to see if it returns the correct values.
+
+        traj_rg = pt.rg_from_traj(test_traj, test_molid, test_mass, 
+                                  test_traj_mol_com)
+        self.assertTrue((traj_rg == test_traj_rg).all())
+
     # def test_profile_density(self):
 
 
