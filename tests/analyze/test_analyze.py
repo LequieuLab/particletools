@@ -3,7 +3,7 @@
 import unittest
 import particletools as pt
 import numpy as np
-from math import ceil
+from math import sqrt
 from numpy.random import default_rng
 
 class TestAnalyzeFunctions(unittest.TestCase):
@@ -78,12 +78,15 @@ class TestAnalyzeFunctions(unittest.TestCase):
                         [   1,    1,    0]]
         test_molid =   [    5,    2,    2,    5,    0,    2,    5,    5]
         test_mass =    [    1,   10,  3.5,    1,   69,  3.5,    1,    1]
-        test_mol_com = [[ 3.6,  3.6,  3.6],
-                        [ 2.5,  2.5,  2.5],
-                        [-0.5, -0.5,    0]]
         test_pos = np.asarray(test_pos)
         test_molid = np.asarray(test_molid)
         test_mass = np.asarray(test_mass)
+
+        # Define the center of mass for each molecule.
+
+        test_mol_com = [[ 3.6,  3.6,  3.6],
+                        [ 2.5,  2.5,  2.5],
+                        [-0.5, -0.5,    0]]
         test_mol_com = np.asarray(test_mol_com)
 
         # Test mol_com_from_frame to see if it returns the correct values.
@@ -118,23 +121,54 @@ class TestAnalyzeFunctions(unittest.TestCase):
                               [   5,    5,  -82]]]
         test_molid =          [   1,    1,    1,    1,    1,   2,    2]
         test_mass =           [   1,    1,    3,    1,    1,  10,   10]
+        test_traj = np.asarray(test_traj)
+        test_molid = np.asarray(test_molid)
+        test_mass = np.asarray(test_mass)
+
+        # Define the center of mass for each molecule across the trajectory.
+
         test_traj_mol_com = [[[   8,   -2,    0],
                               [   1,  0.5,    1]],
                              [[  10,   -1,    6],
                               [   5,   -4,  6.7]],
                              [[   4,    2,    0],
                               [   0,    6,    9]]]
-        test_traj = np.asarray(test_traj)
-        test_molid = np.asarray(test_molid)
-        test_mass = np.asarray(test_mass)
         test_traj_mol_com = np.asarray(test_traj_mol_com)
 
-        # Test mol_com_from_frame to see if it returns the correct values.
+        # Test mol_com_from_traj to see if it returns the correct values.
 
         traj_mol_com = pt.mol_com_from_traj(test_traj, test_molid, test_mass)
         self.assertTrue((traj_mol_com == test_traj_mol_com).all())
 
-    # def test_calc_rg(self):
+    def test_rg_from_frame(self):
+        
+        # Define the positions, molecule IDs, and masses of the particles.
+
+        test_pos =     [[ 4.2,  4.2,  3.2],
+                        [   0,    0,    0],
+                        [   8,    4,    1],
+                        [  -1,    0,    1],
+                        [ -11,    0,    6],
+                        [   9,    0,   -4]]
+        test_molid =    [   1,    0,    0,    2,    2,    2]
+        test_mass =     [  75,    1,    1,   10,    1,    1]
+        test_pos = np.asarray(test_pos)
+        test_molid = np.asarray(test_molid)
+        test_mass = np.asarray(test_mass)
+
+        # Define the center of mass and radius of gyration for each molecule.
+
+        test_mol_com = [[   4,    2,  0.5],
+                        [ 4.2,  4.2,  3.2],
+                        [  -1,    0,    1]]
+        test_rg      =  [4.5, 0, sqrt(250/3)]
+        test_mol_com = np.asarray(test_mol_com)
+        test_rg = np.asarray(test_rg)
+
+        # Test mol_com_from_traj to see if it returns the correct values.
+
+        rg = pt.rg_from_frame(test_pos, test_molid, test_mass, test_mol_com)
+        self.assertTrue((rg == test_rg).all())
 
     # def test_profile_density(self):
 

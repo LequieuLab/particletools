@@ -172,13 +172,16 @@ def mol_com_from_frame(pos, molid, mass):
     # Loop through each molecule, find the corresponding particle indices, and
     # then calculate the center of mass of the molecule.
 
+    # TODO There is likely a neater and faster way to do this that does not
+    # involve taking into account x, y, and z values separately.
+
     for mol in mols:
         indices = np.where(molid == mol)
+        mol_idx = np.where(mols == mol)[0][0]
         mol_mass = np.sum(mass[indices])
         mol_com_x = np.sum(pos[indices][:, 0] * mass[indices]) / mol_mass
         mol_com_y = np.sum(pos[indices][:, 1] * mass[indices]) / mol_mass
         mol_com_z = np.sum(pos[indices][:, 2] * mass[indices]) / mol_mass
-        mol_idx = np.where(mols == mol)[0][0]
         mol_com[mol_idx, 0] = mol_com_x
         mol_com[mol_idx, 1] = mol_com_y
         mol_com[mol_idx, 2] = mol_com_z
@@ -227,89 +230,52 @@ def mol_com_from_traj(traj, molid, mass):
     return traj_mol_com
 
 
-# @jit(nopython=True)
-# def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mdata):
-#     """
-#     Get the center of mass for each molecule at every frame of a trajectory.
-#     
-#     Args:
-#         xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-#              the dimensions are (in order) simulation frame, atom ID, and
-#              xyz coordinates.
-#         beads_per_mol: the ID of particles per molecule stored as a 1D
-#                        numpy array where the index equals the molecule ID.
-#         box_dims: the xyz values of the simulation box stored as a 1D numpy
-#                   array, where index 0 is the x-dimension, index 1 is the
-#                   y-dimension, and index 2 is the z-dimension.
-#         img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-#                    (finish and test documentation later).
-#         mdata: 1D numpy array of particle masses where the index is particle_ID.
-#         mol_com: 2D numpy array with dimensions of frame and molecule ID, holds the
-#                  value of the molecule's center of mass for a given frame.
-# 
-#     Returns:
-#         calc_rg: 2D numpy array with dimensions of frame and molecule ID, holds the
-#                  value of the molecule's radius of gyration for a given frame.
-#     """
-# 
-#     # TODO Finish and test docstring using Sphinx.
-#     # TODO Better name than beads for particles? And are comments appropiate?
-#     # TODO Better name than rg_data?
-# 
-#     # Get simulation parameters from the arguments and preallocate arrays.
-# 
-#     nframes = xyz.shape[0]
-#     nmolec = beads_per_mol.shape[0]
-#     bead_xyz = np.zeros(3)
-#     rg_data = np.zeros((nframes, nmolec))
-# 
-#     # Loop through each frame.
-# 
-#     for frame in range(nframes):
-#         
-#         # Loop through each molecule.
-# 
-#         mol_start = 0
-#         for mol_num in range(nmolec):
-# 
-#             # Find the starting bead ID for this molecule and the next.
-# 
-#             mol_end = beads_per_mol[mol_num] + mol_start
-#         
-#             # Loop through each bead in the current molecule.
-# 
-#             rg_sum = 0
-#             for bead_num in range(mol_start, mol_end):
-# 
-#                 # Unwrap the bead's coordinates. 
-# 
-#                 bead_xyz[0] = xyz[frame][bead_num][0] +\
-#                               np.sum(img_flags[:frame + 1, bead_num, 0]) *\
-#                               box_dims[0]
-#                 bead_xyz[1] = xyz[frame][bead_num][1] +\
-#                               np.sum(img_flags[:frame + 1, bead_num, 1]) *\
-#                               box_dims[1]
-#                 bead_xyz[2] = xyz[frame][bead_num][2] +\
-#                               np.sum(img_flags[:frame + 1, bead_num, 2]) *\
-#                               box_dims[2]
-# 
-#                 # Calculate the bead's squared distance from the molecule's
-#                 # center of mass.
-# 
-#                 dr = bead_xyz - mol_com[frame][mol_num]
-#                 rg_sum += np.dot(dr, dr)
-#             
-#             # Calculate the molecule's radius of gyration for the frame.
-# 
-#             rg_data[frame][mol_num] = sqrt(rg_sum / beads_per_mol[mol_num])
-# 
-#             # Update for the next molecule.
-# 
-#             mol_start = mol_end 
-# 
-#     return rg_data
-# 
-# 
+@jit(nopython=True)
+def rg_from_frame(pos, molid, mass, mol_com):
+    """
+    Calculate the radius of gyration of each molecule for a single frame of
+    their trajectory. The radius of gyration is the average distance between
+    the particles of a molecule and the molecule's center of mass.
+    
+    Args:
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimensions 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimensions 'particle ID (ascending order)'.
+        mol_com: The center of mass of each molecule stored as a 2D numpy array
+                 with dimensions 'molecule ID (ascending order) by molecule 
+                 center of mass (x, y, z)'.
+
+    Returns:
+        rg: The radius of gyration of each molecule stored as a 1D numpy array
+            with dimensions 'molecule ID (ascending order)'.
+    """
+
+    # Get simulation parameters from the arguments and preallocate arrays.
+
+    mols = np.unique(molid)
+    rg = np.zeros(mols.shape[0])
+
+    # Loop through each molecule, find the corresponding particle indices, and
+    # then calculate the radius of gyration of the molecule.
+
+    for mol in mols:
+        indices = np.where(molid == mol)[0]
+        mol_idx = np.where(mols == mol)[0][0]
+        dr = (pos[indices] - mol_com[mol_idx]).flatten()
+        sq_dist = np.dot(dr, dr)
+        N = indices.shape[0]
+        sq_rg = sq_dist / N
+        rg[mol_idx] = sqrt(sq_rg)
+        
+    # Return the molecules' radii of gyration.
+
+    return rg
+
+
 # @jit(nopython=True)
 # def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
 #                     centering, box_dims, mdata):
