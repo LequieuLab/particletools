@@ -146,72 +146,72 @@ def unwrap_traj(traj_wrap, box_config, img_flags):
 @jit(nopython=True)
 def mol_com_from_frame(pos, molid, mass):
     """
-    Calculate the center of mass of each molecule for a single frame of their
-    trajectory.
+    Calculate the center of mass and mass of each molecule for a single frame 
+    of their trajectory.
     
     Args:
         pos: The position of each particle stored as a 2D numpy array with
              dimensions 'particle ID (ascending order) by particle position 
              (x, y, z)'.
         molid: The molecule ID of each particle stored as a 1D numpy array with
-               dimensions 'particle ID (ascending order)'.
+               dimension 'particle ID (ascending order)'.
         mass: The mass of each particle stored as a 1D numpy array with
-              dimensions 'particle ID (ascending order)'.
+              dimension 'particle ID (ascending order)'.
 
     Returns:
         mol_com: The center of mass of each molecule stored as a 2D numpy array
                  with dimensions 'molecule ID (ascending order) by molecule 
                  center of mass (x, y, z)'.
+        mol_mass: The mass of each molecule stored as a 1D numpy array with
+                  dimension 'molecule ID (asecnding order)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
     mols = np.unique(molid)
     mol_com = np.zeros((mols.shape[0], 3))
+    mol_mass = np.zeros(mols.shape[0])
+
+    # Calculate the mass weighted position of each particle.
+
+    wt_pos = (pos.T * mass).T
 
     # Loop through each molecule, find the corresponding particle indices, and
     # then calculate the center of mass of the molecule.
 
-    # TODO There is likely a neater and faster way to do this that does not
-    # involve taking into account x, y, and z values separately.
-
     for mol in mols:
         indices = np.where(molid == mol)
         mol_idx = np.where(mols == mol)[0][0]
-        mol_mass = np.sum(mass[indices])
-        mol_com_x = np.sum(pos[indices][:, 0] * mass[indices]) / mol_mass
-        mol_com_y = np.sum(pos[indices][:, 1] * mass[indices]) / mol_mass
-        mol_com_z = np.sum(pos[indices][:, 2] * mass[indices]) / mol_mass
-        mol_com[mol_idx, 0] = mol_com_x
-        mol_com[mol_idx, 1] = mol_com_y
-        mol_com[mol_idx, 2] = mol_com_z
+        mol_mass[mol_idx] = np.sum(mass[indices])
+        mol_com[mol_idx] = np.sum(wt_pos[indices], axis=0) / mol_mass[mol_idx]
 
-    # Return the molecules' center of masses.
+    # Return the molecules' center of masses and masses.
 
-    return mol_com
+    return mol_com, mol_mass
 
 
 @jit(nopython=True)
 def mol_com_from_traj(traj, molid, mass):
     """
-    Calculate the center of mass of each molecule across their trajectory. The
-    trajectory can be either wrapped or unwrapped, but in most cases a wrapped
-    trajectory will produce incorrect results. 
+    Calculate the center of mass and mass of each molecule across their 
+    trajectory.
     
     Args:
         traj: The trajectory of each particle stored as a 3D numpy array with
               dimensions 'frame (ascending order) by particle ID (ascending 
               order) by particle position (x, y, z)'.
         molid: The molecule ID of each particle stored as a 1D numpy array with
-               dimensions 'particle ID (ascending order)'.
+               dimension 'particle ID (ascending order)'.
         mass: The mass of each particle stored as a 1D numpy array with
-              dimensions 'particle ID (ascending order)'.
+              dimension 'particle ID (ascending order)'.
 
     Returns:
         traj_mol_com: The center of mass of each molecule across their 
                       trajectory stored as a 2D numpy array with dimensions 
                       'frame (ascending order) by molecule ID (ascending order)
                       by molecule center of mass (x, y, z)'.
+        mol_mass: The mass of each molecule stored as a 1D numpy array with
+                  dimension 'molecule ID (asecnding order)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -223,11 +223,12 @@ def mol_com_from_traj(traj, molid, mass):
     # Loop through each frame and get the center of mass of each molecule.
 
     for frame in range(nframes):
-        traj_mol_com[frame] = mol_com_from_frame(traj[frame], molid, mass)
+        mol_com, mol_mass = mol_com_from_frame(traj[frame], molid, mass)
+        traj_mol_com[frame] = mol_com
 
-    # Return the molecules' center of masses over the trajectory.
+    # Return the molecules' center of masses over the trajectory and masses.
 
-    return traj_mol_com
+    return traj_mol_com, mol_mass
 
 
 @jit(nopython=True)
@@ -242,17 +243,19 @@ def rg_from_frame(pos, molid, mass, mol_com):
              dimensions 'particle ID (ascending order) by particle position 
              (x, y, z)'.
         molid: The molecule ID of each particle stored as a 1D numpy array with
-               dimensions 'particle ID (ascending order)'.
+               dimension 'particle ID (ascending order)'.
         mass: The mass of each particle stored as a 1D numpy array with
-              dimensions 'particle ID (ascending order)'.
+              dimension 'particle ID (ascending order)'.
         mol_com: The center of mass of each molecule stored as a 2D numpy array
                  with dimensions 'molecule ID (ascending order) by molecule 
                  center of mass (x, y, z)'.
 
     Returns:
         rg: The radius of gyration of each molecule stored as a 1D numpy array
-            with dimensions 'molecule ID (ascending order)'.
+            with dimension 'molecule ID (ascending order)'.
     """
+
+    # TODO Add selection array to allow filtering.
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
@@ -280,19 +283,17 @@ def rg_from_frame(pos, molid, mass, mol_com):
 def rg_from_traj(traj, molid, mass, traj_mol_com):
     """
     Calculate the radius of gyration of each molecule across their trajectory. 
-    The trajectory can be either wrapped or unwrapped, but in most cases a 
-    wrapped trajectory will produce incorrect results. The radius of gyration 
-    is the average distance between the particles of a molecule and the 
-    molecule's center of mass.
+    The radius of gyration is the average distance between the particles of a 
+    molecule and the molecule's center of mass.
     
     Args:
         traj: The trajectory of each particle stored as a 3D numpy array with
               dimensions 'frame (ascending order) by particle ID (ascending 
               order) by particle position (x, y, z)'.
         molid: The molecule ID of each particle stored as a 1D numpy array with
-               dimensions 'particle ID (ascending order)'.
+               dimension 'particle ID (ascending order)'.
         mass: The mass of each particle stored as a 1D numpy array with
-              dimensions 'particle ID (ascending order)'.
+              dimension 'particle ID (ascending order)'.
         traj_mol_com: The center of mass of each molecule across their
                       trajectory stored as a 3D numpy array with dimensions 
                       'frame (ascending order) by molecule ID (ascending order)
@@ -303,6 +304,8 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
                  trajectory stored as a 2D numpy array with dimensions 'frame 
                  (ascending order) by molecule ID (ascending order)'.
     """
+
+    # TODO Add selection array to allow filtering.
 
     # Get simulation parameters from the arguments and preallocate arrays.
     
@@ -322,34 +325,164 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
 
 
 # @jit(nopython=True)
-# def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
-#                     centering, box_dims, mdata):
+def density_from_frame(pos, molid, mass, box_config, selection, bin_dim, nbins, 
+                       centering='NONE', ccut=350):
+
+    # def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
+    #                     centering, box_dims, mdata):
+
+    # TODO Build docstring.
+    # TODO Expand to triclinic boxes.
+    # TODO Possibly separate centering from density_from_frame, but then this
+    # might cause density_from_traj to still have centering if it is to handle
+    # the averaging of densities. For example, the slab centering applied to
+    # the final average compared to each individual frame will not be equal.
+
+    # Calculate the cross section along the bin dimension.
+
+    cross_section = 1
+    for dim in range(3):
+        if dim == bin_dim:
+            continue
+        cross_section *= box_config[dim]
+
+    # Create histogram bins along the bin dimension.
+
+    bin_range = box_config[bin_dim]
+    bin_lo = bin_range / -2
+    bin_hi = bin_range / 2
+    bin_width = bin_range / nbins
+    bin_vol = bin_width * cross_section
+    bin_pos = np.arange(bin_lo, bin_hi, bin_width)
+    bin_val = np.zeros(nbins)
+
+    # Define the offset to apply for centering.
+
+    offset = np.zeros(3)
+    
+    # If the centering method is 'SYSTEM', then calculate the entire system's
+    # center of mass and set it as the offset.
+
+    if centering == 'SYSTEM':
+        wt_pos = (pos.T * mass).T
+        offset = np.sum(wt_pos, axis=0) / np.sum(mass)
+
+    # If the centering method is 'SLAB', then calculate the center of mass of
+    # the largest cluster (referred to as the slab) and set it as the offset.
+    
+    if centering == 'SLAB':
+
+        # Get the center of mass and mass of each molecule.
+
+        mol_com, mol_mass = mol_com_from_frame(pos, molid, mass)
+
+        # Create a contact map of the molecules, which details whether a
+        # molecule is within the contact cutoff (ccut) of other molecules.
+
+        nmol = np.unique(molid).shape[0]
+        contact_map = np.zeros((nmol, nmol))
+        for i in range(nmol):                           
+            mol_i_pos = mol_com[i]                     
+            for j in range(i, nmol):                                                
+                if i == j:
+                    contact_map[i][j] += 1  # Contact of a mol with itself.
+                    continue
+                mol_j_pos = mol_com[j]
+                dr = mol_i_pos - mol_j_pos
+                dist = sqrt(np.dot(dr, dr))
+                if dist <= ccut:                        
+                    contact_map[i][j] += 1
+                    contact_map[j][i] += 1
+
+        # Compress the contact map by combining rows with shared contacts. This
+        # causes each row to represent a unique cluster.
+        
+        for row in range(contact_map.shape[0]):
+            new_contacts = True
+            while new_contacts:
+                new_contacts = False
+                for col in range(contact_map.shape[1]):
+                    if row == col:  # Skip contacts of a mol with itself.
+                        continue
+                    if (contact_map[row][col] != 0 and 
+                        np.any(contact_map[col])):  # Contact of non-zero row.
+                        new_contacts = True
+                        contact_map[row] += contact_map[col]
+                        contact_map[col].fill(0)
+
+        # From the compressed contact map, find the largest cluster (i.e. the
+        # slab) and set the offset to the slab's center of mass.
+
+        cluster_sizes = np.count_nonzero(contact_map, axis=1)
+        slab = np.argmax(cluster_sizes)
+        slab_mols = np.nonzero(contact_map[slab])
+        wt_mol_com = (mol_com.T * mol_mass).T
+        offset = np.sum(wt_mol_com[slab_mols], axis=0) /\
+                 np.sum(mol_mass[slab_mols])
+
+
+    # Filter the particle positions based on the selection array. 
+    
+    pos_sel = pos[selection, :]
+
+    # For each selected particle, apply the center of mass offset and bin it.
+    # Periodic boundary conditions are applied after the offset.
+
+    for i in range(pos_sel.shape[0]):
+            pos_i = pos_sel[i][bin_dim] - offset[bin_dim]
+            if pos_i >= bin_hi:
+                pos_i -= bin_range
+            if pos_i < bin_lo:
+                pos_i += bin_range
+            bin_idx = int(((pos_i / bin_range + 1 / 2) * nbins))
+            if bin_idx < 0 or bin_idx >= nbins:
+                print('Error: invalid bin index created.')
+            bin_val[bin_idx] += 1
+
+    # Convert the binned particles to a density profile.
+
+    bin_conc = bin_val / bin_vol
+    density_profile = np.column_stack((bin_pos, bin_conc))
+
+    # Return the density profile across the desired dimension of the box.
+
+    return density_profile
+
+
+# # @jit(nopython=True)
+# def density_from_frame(pos, molid, mass, box_config, selection, bin_dim, nbins,
+#                        nsections=1, centering='NONE', ccut=350):
+# 
+#     # def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
+#     #                     centering, box_dims, mdata):
 # 
 #     # TODO Build docstring.
-#     # TODO Implement clustering.
-#     # TODO Have it use get_mol_com for slab centering.
+#     # TODO Have it use get_mol_com for centering.
+#     # TODO Expand to triclinic boxes.
 # 
-#     # Filter the trajectory based on the selected beads.
+#     # Filter the particle positions based on the selection array. 
 #     
-#     xyz_sel = xyz[:, bead_sel, :]
+#     pos_sel = pos[selection, :]
 # 
-#     # Find the longest dimension of the box, known as the slab dimension.
+#     # Find the longest dimension of the box and calculate the cross sectional
+#     # area along that dimension.
 # 
-#     slab_length = max(box_dims)
-#     slab_cross_section = 1
-#     for i in range(0, len(box_dims)):
-#         if box_dims[i] == slab_length:
-#             slab_dim = i
+#     lx, ly, lz = box_config[0:3]
+#     longest_len = max((lx, ly, lz))
+#     cross_section = 1
+#     for i in range(3):
+#         if box_config[i] == longest_len:
+#             longest_dim = i
 #         else:
-#             slab_cross_section *= box_dims[i]
-#     slab_begin = slab_length / -2
-#     slab_end = slab_length / 2
+#             cross_section *= box_config[i]
 # 
-#     # Create histogram bins and dimension array.
+#     # Create histogram bins along the longest dimension.
 # 
-#     bin_width = slab_length / nbins
-#     bin_volume = bin_width * slab_cross_section
-#     dimension = np.arange(slab_begin, slab_end, bin_width)
+#     bin_lo = longest_len / -2
+#     bin_hi = longest_len / 2
+#     bin_width = longest_len / nbins
+#     bin_vol = bin_width * cross_section
+#     bin_poss = np.arange(bin_lo, bin_hi, bin_width)
 # 
 #     # Calculate the first frame to start, the frames per section, and prepare
 #     # arrays for data storage.
@@ -367,13 +500,13 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
 #     # used and preallocate memory for arrays.
 #     
 #     if centering == 'SLAB':
-#         nmolec = beads_per_mol.shape[0]
-#         mol_com = np.zeros((nframes, nmolec, 3))
+#         nmol = beads_per_mol.shape[0]
+#         mol_com = np.zeros((nframes, nmol, 3))
 #         largest_mol = np.amax(beads_per_mol)
 #         mol_data = np.zeros((4, largest_mol))
 #         for frame in range(nframes):
 #             mol_start = 0
-#             for mol_num in range(nmolec):
+#             for mol_num in range(nmol):
 #                 mol_end = beads_per_mol[mol_num] + mol_start 
 #                 for bead_num in range(mol_start, mol_end):
 #                     mol_data[0][bead_num - mol_start] = xyz[frame][bead_num][0]
@@ -389,10 +522,10 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
 #                 mol_com[frame][mol_num][2] = mass_weighted_z / total_mass
 #                 mol_start = mol_end
 #                 mol_data.fill(0)
-#         mol_mass = np.zeros(nmolec)
-#         beads_in_cluster = np.zeros(nmolec)
+#         mol_mass = np.zeros(nmol)
+#         beads_in_cluster = np.zeros(nmol)
 #         mol_start = 0
-#         for mol_num in range(nmolec):
+#         for mol_num in range(nmol):
 #             mol_end = beads_per_mol[mol_num] + mol_start
 #             mol_mass[mol_num] = np.sum(mdata[mol_start : mol_end]) 
 #             mol_start = mol_end
@@ -431,15 +564,15 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
 #             # Create a contact of the molecules, which details whether a
 #             # molecule is within the cluster cutoff (ccut) of other molecules.
 # 
-#             contact_map = np.zeros((nmolec, nmolec))
-#             for i in range(nmolec):                           
-#                 i_mol_pos = np.array([mol_x[i], mol_y[i], mol_z[i]])                      
-#                 for j in range(i, nmolec):                                                
+#             contact_map = np.zeros((nmol, nmol))
+#             for i in range(nmol):                           
+#                 mol_i_pos = np.array([mol_x[i], mol_y[i], mol_z[i]])                      
+#                 for j in range(i, nmol):                                                
 #                     if i == j:
 #                         contact_map[i][j] += 1
 #                         continue
-#                     j_mol_pos = np.array([mol_x[j], mol_y[j], mol_z[j]])                  
-#                     dr = i_mol_pos - j_mol_pos
+#                     mol_j_pos = np.array([mol_x[j], mol_y[j], mol_z[j]])                  
+#                     dr = mol_i_pos - mol_j_pos
 #                     distance = sqrt(np.dot(dr, dr))
 #                     if distance <= ccut:                        
 #                         contact_map[i][j] += 1
@@ -503,14 +636,14 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
 #     
 #     # Convert binned beads to concentration values and create density profiles.
 # 
-#     conc = beads_per_bin / frames_per_sec / bin_volume
+#     conc = beads_per_bin / frames_per_sec / bin_vol
 #     density_profiles = np.zeros((nsections, nbins, 2))
 #     for i in range(nsections):
 #         density_profiles[i] = np.column_stack((dimension, conc[i]))
 # 
 #     return density_profiles
-# 
-# 
+
+
 # # @jit(nopython=True)
 # # def bead_heatmap(xyz, bead_list, fixed_dim, rcut, nbins, box_dims, img_flags):
 # #     """
