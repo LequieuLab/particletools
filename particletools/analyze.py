@@ -324,14 +324,54 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
     return traj_rg
 
 
-# @jit(nopython=True)
-def density_from_frame(pos, molid, mass, box_config, selection, bin_dim, nbins, 
+@jit(nopython=True)
+def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins, 
                        centering='NONE', ccut=350):
+    """
+    Calculate the density profile of the selected particles along a given axis
+    for a single frame.
+    
+    Args:
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+        selection: The selected particles chosen for this calculation stored as
+                   a 1D numpy array with dimension 'particle ID' (ascending 
+                   order). For example, for density_from_frame, the particles
+                   making up the density returned are just the selected 
+                   particles.
+        bin_ax: The axis along which bins are generated for counting particles.
+                In most cases, the bin_ax can have a value of 0 (x-axis), 1
+                (y-axis), or 2 (z-axis).
+        nbins: The number of bins to generate for counting particles.
+        centering: The centering method used when calculating the density
+                   profile. Centering can have values of 'NONE' (no centering
+                   is performed), 'SYSTEM' (all particle positions are shifted
+                   so that the system's center of mass is at the center of the
+                   profile), or 'SLAB' (all particle positions are shifted so
+                   that the largest cluster of particles is at the center of
+                   the profile).
+        ccut: The cluster cutoff used for determining clusters in the 'SLAB'
+              centering method. For efficiency, molecules are clustered
+              together instead of particles, and ccut is the maximum
+              distance a molecule can be from the closest molecule in the same
+              cluster.
 
-    # def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
-    #                     centering, box_dims, mdata):
+    Returns:
+        density_profile: The density profile of the selected particles along a
+                         given axis stored as a 2D numpy array with dimensions
+                         'bin index by bin properties (position along the axis,
+                         density at that position).
+    """
 
-    # TODO Build docstring.
     # TODO Expand to triclinic boxes.
     # TODO Possibly separate centering from density_from_frame, but then this
     # might cause density_from_traj to still have centering if it is to handle
@@ -342,13 +382,13 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_dim, nbins,
 
     cross_section = 1
     for dim in range(3):
-        if dim == bin_dim:
+        if dim == bin_ax:
             continue
         cross_section *= box_config[dim]
 
     # Create histogram bins along the bin dimension.
 
-    bin_range = box_config[bin_dim]
+    bin_range = box_config[bin_ax]
     bin_lo = bin_range / -2
     bin_hi = bin_range / 2
     bin_width = bin_range / nbins
@@ -429,7 +469,7 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_dim, nbins,
     # Periodic boundary conditions are applied after the offset.
 
     for i in range(pos_sel.shape[0]):
-            pos_i = pos_sel[i][bin_dim] - offset[bin_dim]
+            pos_i = pos_sel[i][bin_ax] - offset[bin_ax]
             if pos_i >= bin_hi:
                 pos_i -= bin_range
             if pos_i < bin_lo:
@@ -449,199 +489,70 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_dim, nbins,
     return density_profile
 
 
-# # @jit(nopython=True)
-# def density_from_frame(pos, molid, mass, box_config, selection, bin_dim, nbins,
-#                        nsections=1, centering='NONE', ccut=350):
-# 
-#     # def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
-#     #                     centering, box_dims, mdata):
-# 
-#     # TODO Build docstring.
-#     # TODO Have it use get_mol_com for centering.
-#     # TODO Expand to triclinic boxes.
-# 
-#     # Filter the particle positions based on the selection array. 
-#     
-#     pos_sel = pos[selection, :]
-# 
-#     # Find the longest dimension of the box and calculate the cross sectional
-#     # area along that dimension.
-# 
-#     lx, ly, lz = box_config[0:3]
-#     longest_len = max((lx, ly, lz))
-#     cross_section = 1
-#     for i in range(3):
-#         if box_config[i] == longest_len:
-#             longest_dim = i
-#         else:
-#             cross_section *= box_config[i]
-# 
-#     # Create histogram bins along the longest dimension.
-# 
-#     bin_lo = longest_len / -2
-#     bin_hi = longest_len / 2
-#     bin_width = longest_len / nbins
-#     bin_vol = bin_width * cross_section
-#     bin_poss = np.arange(bin_lo, bin_hi, bin_width)
-# 
-#     # Calculate the first frame to start, the frames per section, and prepare
-#     # arrays for data storage.
-# 
-#     nframes = xyz.shape[0]
-#     nbeads = xyz.shape[1]
-#     frames_per_sec = nframes // nsections
-#     frame_start = nframes - nsections * frames_per_sec
-#     sec_num = 0
-#     beads_per_bin = np.zeros((nsections, nbins))
-#     slab_molecules_per_frame = np.zeros(nsections * frames_per_sec)
-#     offset = np.zeros(3)
-# 
-#     # Get the center of mass and mass of each molecule if slab centering is 
-#     # used and preallocate memory for arrays.
-#     
-#     if centering == 'SLAB':
-#         nmol = beads_per_mol.shape[0]
-#         mol_com = np.zeros((nframes, nmol, 3))
-#         largest_mol = np.amax(beads_per_mol)
-#         mol_data = np.zeros((4, largest_mol))
-#         for frame in range(nframes):
-#             mol_start = 0
-#             for mol_num in range(nmol):
-#                 mol_end = beads_per_mol[mol_num] + mol_start 
-#                 for bead_num in range(mol_start, mol_end):
-#                     mol_data[0][bead_num - mol_start] = xyz[frame][bead_num][0]
-#                     mol_data[1][bead_num - mol_start] = xyz[frame][bead_num][1]
-#                     mol_data[2][bead_num - mol_start] = xyz[frame][bead_num][2]
-#                     mol_data[3][bead_num - mol_start] = mdata[bead_num]
-#                 mass_weighted_x = np.sum(mol_data[0] * mol_data[3])
-#                 mass_weighted_y = np.sum(mol_data[1] * mol_data[3])
-#                 mass_weighted_z = np.sum(mol_data[2] * mol_data[3])
-#                 total_mass = np.sum(mol_data[3])
-#                 mol_com[frame][mol_num][0] = mass_weighted_x / total_mass
-#                 mol_com[frame][mol_num][1] = mass_weighted_y / total_mass
-#                 mol_com[frame][mol_num][2] = mass_weighted_z / total_mass
-#                 mol_start = mol_end
-#                 mol_data.fill(0)
-#         mol_mass = np.zeros(nmol)
-#         beads_in_cluster = np.zeros(nmol)
-#         mol_start = 0
-#         for mol_num in range(nmol):
-#             mol_end = beads_per_mol[mol_num] + mol_start
-#             mol_mass[mol_num] = np.sum(mdata[mol_start : mol_end]) 
-#             mol_start = mol_end
-# 
-#     # Loop through each frame and bin particles. The center of mass determined
-#     # by the method string is used as a baseline in the binning process.
-#     
-#     for frame in range(frame_start, nframes):
-# 
-#         if centering == 'SYSTEM':
-#             xdata = xyz[frame][:, 0]
-#             ydata = xyz[frame][:, 1]
-#             zdata = xyz[frame][:, 2]
-#             mass_weighted_x = np.sum(xdata * mdata)
-#             mass_weighted_y = np.sum(ydata * mdata)
-#             mass_weighted_z = np.sum(zdata * mdata)
-#             total_mass = np.sum(mdata)
-#             offset[0] = mass_weighted_x / total_mass
-#             offset[1] = mass_weighted_y / total_mass
-#             offset[2] = mass_weighted_z / total_mass
-#         
-#         # The slab method for calculating the positional offset for the system.
-#         # Works by finding the largest cluster in the frame, and setting that
-#         # cluster's center of mass to be the positional offset. Clusters are 
-#         # determined by looking at the distance between the center of mass of 
-#         # molecules.
-# 
-#         if centering == 'SLAB':
-# 
-#             # Find clusters based on the center of mass of molecules.
-# 
-#             mol_x = mol_com[frame][:, 0]
-#             mol_y = mol_com[frame][:, 1]
-#             mol_z = mol_com[frame][:, 2]
-# 
-#             # Create a contact of the molecules, which details whether a
-#             # molecule is within the cluster cutoff (ccut) of other molecules.
-# 
-#             contact_map = np.zeros((nmol, nmol))
-#             for i in range(nmol):                           
-#                 mol_i_pos = np.array([mol_x[i], mol_y[i], mol_z[i]])                      
-#                 for j in range(i, nmol):                                                
-#                     if i == j:
-#                         contact_map[i][j] += 1
-#                         continue
-#                     mol_j_pos = np.array([mol_x[j], mol_y[j], mol_z[j]])                  
-#                     dr = mol_i_pos - mol_j_pos
-#                     distance = sqrt(np.dot(dr, dr))
-#                     if distance <= ccut:                        
-#                         contact_map[i][j] += 1
-#                         contact_map[j][i] += 1
-# 
-#             # Compress the contact map by combining rows with shared contacts.
-#             # This causes each row to represent a unique cluster.
-#             
-#             for row in range(contact_map.shape[0]):
-#                 new_contacts = True
-#                 while new_contacts:
-#                     new_contacts = False
-#                     for col in range(contact_map.shape[1]):
-#                         if row == col:  # Skip self-contacts.
-#                             continue
-#                         if (contact_map[row][col] != 0 and 
-#                             np.any(contact_map[col])):  # Non-zero row contact.
-#                             new_contacts = True
-#                             contact_map[row] += contact_map[col]
-#                             contact_map[col].fill(0)
-# 
-#             # From the compressed contact map, find the largest cluster and
-#             # set the positional offset to the cluster's center of mass.
-# 
-#             beads_in_cluster.fill(0)
-#             cluster_sizes = np.count_nonzero(contact_map, axis=1)
-#             largest_cluster_idx = np.argmax(cluster_sizes)
-#             mass_weighted_x = 0
-#             mass_weighted_y = 0
-#             mass_weighted_z = 0
-#             total_mass = 0
-#             for col in range(contact_map.shape[1]):
-#                 if contact_map[largest_cluster_idx][col] != 0:
-#                     mass_weighted_x += mol_x[col] * mol_mass[col]
-#                     mass_weighted_y += mol_y[col] * mol_mass[col]
-#                     mass_weighted_z += mol_z[col] * mol_mass[col]
-#                     total_mass += mol_mass[col]
-#             offset[0] = mass_weighted_x / total_mass
-#             offset[1] = mass_weighted_y / total_mass
-#             offset[2] = mass_weighted_z / total_mass
-# 
-#         # For each particle of interest, apply the center of mass offset and 
-#         # bin it. Periodic boundary conditions are applied when applicable.
-# 
-#         for bead_num in range(xyz_sel.shape[1]):
-#                 bead_pos = xyz_sel[frame][bead_num][slab_dim] -\
-#                            offset[slab_dim]
-#                 if bead_pos >= slab_end:
-#                     bead_pos -= slab_length
-#                 if bead_pos < slab_begin:
-#                     bead_pos += slab_length
-#                 bin_idx = int(((bead_pos / slab_length + 1 / 2) * nbins))
-#                 if bin_idx >= nbins or bin_idx < 0:
-#                     print('Error: invalid bin index created.')
-#                 beads_per_bin[sec_num][bin_idx] += 1
-# 
-#         # If a section is reached, increment the section ID.
-# 
-#         if (frame - frame_start + 1) % frames_per_sec == 0:
-#             sec_num += 1
-#     
-#     # Convert binned beads to concentration values and create density profiles.
-# 
-#     conc = beads_per_bin / frames_per_sec / bin_vol
-#     density_profiles = np.zeros((nsections, nbins, 2))
-#     for i in range(nsections):
-#         density_profiles[i] = np.column_stack((dimension, conc[i]))
-# 
-#     return density_profiles
+@jit(nopython=True)
+def density_from_traj(traj, molid, mass, box_config, selection, bin_ax, nbins,
+                      centering='NONE', ccut=350):
+    """
+    Calculate the average density profile of the selected particles along a 
+    given axis over their trajectory.
+    
+    Args:
+        traj: The trajectory of each particle stored as a 3D numpy array with
+              dimensions 'frame (ascending order) by particle ID (ascending 
+              order) by particle position (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+        selection: The selected particles chosen for this calculation stored as
+                   a 1D numpy array with dimension 'particle ID' (ascending 
+                   order). For example, for density_from_frame, the particles
+                   making up the density returned are just the selected 
+                   particles.
+        bin_ax: The axis along which bins are generated for counting particles.
+                In most cases, the bin_ax can have a value of 0 (x-axis), 1
+                (y-axis), or 2 (z-axis).
+        nbins: The number of bins to generate for counting particles.
+        centering: The centering method used when calculating the density
+                   profile. Centering can have values of 'NONE' (no centering
+                   is performed), 'SYSTEM' (all particle positions are shifted
+                   so that the system's center of mass is at the center of the
+                   profile), or 'SLAB' (all particle positions are shifted so
+                   that the largest cluster of particles is at the center of
+                   the profile).
+        ccut: The cluster cutoff used for determining clusters in the 'SLAB'
+              centering method. For efficiency, molecules are clustered
+              together instead of particles, and ccut is the maximum
+              distance a molecule can be from the closest molecule in the same
+              cluster.
+
+    Returns:
+        density_profile: The density profile of the selected particles along a
+                         given axis stored as a 2D numpy array with dimensions
+                         'bin index by bin properties (position along the axis,
+                         density at that position).
+    """
+    # Get the number of simulation frames and preallocate a density profile.
+    
+    nframes = traj.shape[0]
+    density_profile = np.zeros((nbins, 2))
+
+    # Loop through each frame and sum the density profiles.
+
+    for frame in range(nframes):
+        pos = traj[frame]
+        density_profile += density_from_frame(pos, molid, mass, box_config,
+                                              selection, bin_ax, nbins,
+                                              centering, ccut)
+
+    # Return the average density profile over the frames.
+
+    density_profile /= nframes
+    return density_profile 
 
 
 # # @jit(nopython=True)

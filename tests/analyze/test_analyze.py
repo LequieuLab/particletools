@@ -226,23 +226,22 @@ class TestAnalyzeFunctions(unittest.TestCase):
         test_traj_rg = pt.rg_from_traj(traj, molid, mass, traj_mol_com) 
         self.assertTrue((test_traj_rg == traj_rg).all())
 
-    def test_profile_density(self):
+    def test_density_from_frame(self):
 
-        # Define the positions, molecule IDs, and masses of particles.
-        # TODO Resume: fix this -3.6 from going into -5 bin
+        # Define the positions, molecule IDs, and masses of the particles.
 
-        pos =     [[-3.4,    0,    0],  # mol 3
-                   [2.25,    0,    0],  # mol 9
-                   [   0,    0,    0],  # mol 8
-                   [   1,    1,    0],  # mol 5
-                   [   1,    0,    1],  # mol 5
-                   [   2,    2,    0],  # mol 6
-                   [   2,   -2,    0],  # mol 6
-                   [   3,    0,    0],  # mol 7
-                   [   4,    0,    0],  # mol 7
-                   [  -4,    1,   50],  # mol 1
-                   [  -4,    0,   50],  # mol 2
-                   [  -3,    0,    0]]  # mol 9
+        pos =     [[-3.4,    0,    0],  
+                   [2.25,    0,    0],  
+                   [   0,    0,    0],  
+                   [   1,    1,    0],  
+                   [   1,    0,    1],  
+                   [   2,    2,    0],  
+                   [   2,   -2,    0],  
+                   [   3,    0,    0],  
+                   [   4,    0,    0],  
+                   [  -4,    1,   50],  
+                   [  -4,    0,   50],  
+                   [  -3,    0,    0]]  
         molid = [3, 9, 8, 5, 5, 6, 6, 7, 7, 1, 2, 9]
         mass =  [1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         pos = np.asarray(pos)
@@ -254,7 +253,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
 
         box_config = [10, 1, 50, 0, 0, 0]
         selection = [0, 2, 3, 4, 5, 6, 7, 8, 11]
-        bin_dim = 0
+        bin_ax = 0
         nbins = 10
         ccut = 2
         box_config = np.asarray(box_config)
@@ -274,10 +273,10 @@ class TestAnalyzeFunctions(unittest.TestCase):
                            [   3,   1], 
                            [   4,   1]]
         density_profile = np.asarray(density_profile, dtype=np.float64)
-        density_profile[:, 1] *= 1 / 50
+        density_profile[:, 1] /= 50
         test_density_profile = pt.density_from_frame(pos, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_dim, nbins, 'NONE', 
+                                                     bin_ax, nbins, 'NONE', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
@@ -295,10 +294,10 @@ class TestAnalyzeFunctions(unittest.TestCase):
                            [   3,   1], 
                            [   4,   0]]
         density_profile = np.asarray(density_profile, dtype=np.float64)
-        density_profile[:, 1] *= 1 / 50
+        density_profile[:, 1] /= 50
         test_density_profile = pt.density_from_frame(pos, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_dim, nbins, 'SYSTEM', 
+                                                     bin_ax, nbins, 'SYSTEM', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
@@ -316,10 +315,105 @@ class TestAnalyzeFunctions(unittest.TestCase):
                            [   3,   0], 
                            [   4,   0]]
         density_profile = np.asarray(density_profile, dtype=np.float64)
-        density_profile[:, 1] *= 1 / 50
+        density_profile[:, 1] /= 50
         test_density_profile = pt.density_from_frame(pos, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_dim, nbins, 'SLAB', 
+                                                     bin_ax, nbins, 'SLAB', 
+                                                     ccut)
+        self.assertTrue((test_density_profile == density_profile).all())
+
+    def test_density_from_traj(self):
+
+        # Define the trajectory, molecule IDs, and masses of the particles.
+
+        traj =    [[[   0,   -5,   40],  
+                    [   0,    5,    0],  
+                    [   0,    7,    0],  
+                    [   0,    7,    2],  
+                    [   0,    9,    0]],
+
+                   [[   0,   -8,   30],  
+                    [   0,    3,    0],  
+                    [   0,    5,    0],  
+                    [   0,    9,    0],  
+                    [   0,    7,    0]]]
+        molid = [ 5,  1,  1,  3,  3] 
+        mass =  [96,  1,  1,  1,  1] 
+        traj = np.asarray(traj)
+        molid = np.asarray(molid)
+        mass = np.asarray(mass)
+
+        # Define an orthogonal box configuration, a selection array, the bin
+        # dimension, the number of bins, and the cluster cutoff.
+
+        box_config = [3, 20, 50, 0, 0, 0]
+        selection = [1, 2, 3]
+        bin_ax = 1
+        nbins = 10
+        ccut = 10
+        box_config = np.asarray(box_config)
+        selection = np.asarray(selection)
+
+        # For the 'NONE' centering method, define the density profile and test
+        # density_from_frame to see if it returns the correct values.
+
+        density_profile = [[ -10,   0], 
+                           [  -8,   0], 
+                           [  -6,   0], 
+                           [  -4,   0], 
+                           [  -2,   0],  
+                           [   0,   0], 
+                           [   2, 0.5], 
+                           [   4,   1], 
+                           [   6,   1], 
+                           [   8, 0.5]] 
+        density_profile = np.asarray(density_profile, dtype=np.float64)
+        density_profile[:, 1] /= (3 * 50 * 20 / 10)
+        test_density_profile = pt.density_from_traj(traj, molid, mass,
+                                                    box_config, selection,
+                                                    bin_ax, nbins, 'NONE', 
+                                                    ccut)
+        self.assertTrue((test_density_profile == density_profile).all())
+
+        # For the 'SYSTEM' centering method, define the density profile and
+        # test density_from_frame to see if it returns the correct values.
+
+        density_profile = [[ -10, 1.5], 
+                           [  -8, 0.5], 
+                           [  -6,   0], 
+                           [  -4, 0.5], 
+                           [  -2,   0], 
+                           [   0,   0], 
+                           [   2,   0], 
+                           [   4,   0], 
+                           [   6,   0], 
+                           [   8, 0.5]] 
+        density_profile = np.asarray(density_profile, dtype=np.float64)
+        density_profile[:, 1] /= (3 * 50 * 20 / 10)
+        test_density_profile = pt.density_from_traj(traj, molid, mass, 
+                                                     box_config, selection, 
+                                                     bin_ax, nbins, 'SYSTEM', 
+                                                     ccut)
+        self.assertTrue((test_density_profile == density_profile).all())
+
+        # For the 'SLAB' centering method, define the density profile and test
+        # density_from_frame to see if it returns the correct values.
+
+        density_profile = [[ -10,   0],  
+                           [  -8,   0], 
+                           [  -6,   0], 
+                           [  -4, 0.5], 
+                           [  -2,   1], 
+                           [   0,   1], 
+                           [   2, 0.5], 
+                           [   4,   0], 
+                           [   6,   0], 
+                           [   8,   0]] 
+        density_profile = np.asarray(density_profile, dtype=np.float64)
+        density_profile[:, 1] /= (3 * 50 * 20 / 10)
+        test_density_profile = pt.density_from_traj(traj, molid, mass, 
+                                                     box_config, selection, 
+                                                     bin_ax, nbins, 'SLAB', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
