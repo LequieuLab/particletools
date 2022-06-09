@@ -4,8 +4,7 @@
 Functions to analyze a particle based trajectory.
 '''
 
-# TODO Go through and change [x][y][z] notation to [x, y, z].
-# TODO Go through and change bead -> particle.
+# TODO Expand functions that use box_config as an argument to use tilt factors.
 
 import numpy as np
 from math import sqrt
@@ -15,11 +14,11 @@ from numba import jit
 def img_flags_from_traj(traj_wrap, box_config):
     """
     Calculate the image flags of a wrapped particle-based trajectory. This 
-    assumes that the dump frequency is sufficiently high such that beads never 
-    travel more than half the length of a box dimension, otherwise image flags 
-    may be incorrect. Molecules that are spread across a periodic boundary will
-    have incorrect image flags, potentially introducing errors in other 
-    calculations. Assumes that the box dimensions are constant in time.
+    assumes that the dump frequency is sufficiently high such that particles 
+    never travel more than half the length of a box dimension, otherwise image 
+    flags may be incorrect. Molecules that are spread across a periodic 
+    boundary will have incorrect image flags, potentially introducing errors in
+    other calculations. Assumes that the box dimensions are constant in time.
     
     Args:
         traj_wrap: The wrapped trajectory of each particle stored as a 3D 
@@ -36,10 +35,6 @@ def img_flags_from_traj(traj_wrap, box_config):
                    order) by particle ID (ascending order) by particle image 
                    flag (ix, iy, iz)'.
     """
-
-    # TODO Expand to triclinic boxes.
-    # TODO Expand to non-constant box dimensions, though not sure how image
-    # flags would be packaged in that case.
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
@@ -109,10 +104,6 @@ def unwrap_traj(traj_wrap, box_config, img_flags):
                      (x, y, z)'.
     """
 
-    # TODO Expand to triclinic boxes.
-    # TODO Expand to non-constant box dimensions, though not sure how image
-    # flags would be packaged in that case.
-
     # Get simulation parameters from the arguments and preallocate arrays.
 
     nframes = traj_wrap.shape[0]
@@ -181,7 +172,7 @@ def mol_com_from_frame(pos, molid, mass):
 
     for mol in mols:
         indices = np.where(molid == mol)
-        mol_idx = np.where(mols == mol)[0][0]
+        mol_idx = np.where(mols == mol)
         mol_mass[mol_idx] = np.sum(mass[indices])
         mol_com[mol_idx] = np.sum(wt_pos[indices], axis=0) / mol_mass[mol_idx]
 
@@ -255,8 +246,6 @@ def rg_from_frame(pos, molid, mass, mol_com):
             with dimension 'molecule ID (ascending order)'.
     """
 
-    # TODO Add selection array to allow filtering.
-
     # Get simulation parameters from the arguments and preallocate arrays.
 
     mols = np.unique(molid)
@@ -267,7 +256,7 @@ def rg_from_frame(pos, molid, mass, mol_com):
 
     for mol in mols:
         indices = np.where(molid == mol)[0]
-        mol_idx = np.where(mols == mol)[0][0]
+        mol_idx = np.where(mols == mol)
         dr = (pos[indices] - mol_com[mol_idx]).flatten()
         sq_dist = np.dot(dr, dr)
         N = indices.shape[0]
@@ -304,8 +293,6 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
                  trajectory stored as a 2D numpy array with dimensions 'frame 
                  (ascending order) by molecule ID (ascending order)'.
     """
-
-    # TODO Add selection array to allow filtering.
 
     # Get simulation parameters from the arguments and preallocate arrays.
     
@@ -372,12 +359,6 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
                          density at that position).
     """
 
-    # TODO Expand to triclinic boxes.
-    # TODO Possibly separate centering from density_from_frame, but then this
-    # might cause density_from_traj to still have centering if it is to handle
-    # the averaging of densities. For example, the slab centering applied to
-    # the final average compared to each individual frame will not be equal.
-
     # Calculate the cross section along the bin dimension.
 
     cross_section = 1
@@ -425,14 +406,14 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
             mol_i_pos = mol_com[i]                     
             for j in range(i, nmol):                                                
                 if i == j:
-                    contact_map[i][j] += 1  # Contact of a mol with itself.
+                    contact_map[i, j] += 1  # Contact of a mol with itself.
                     continue
                 mol_j_pos = mol_com[j]
                 dr = mol_i_pos - mol_j_pos
                 dist = sqrt(np.dot(dr, dr))
                 if dist <= ccut:                        
-                    contact_map[i][j] += 1
-                    contact_map[j][i] += 1
+                    contact_map[i, j] += 1
+                    contact_map[j, i] += 1
 
         # Compress the contact map by combining rows with shared contacts. This
         # causes each row to represent a unique cluster.
@@ -444,7 +425,7 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
                 for col in range(contact_map.shape[1]):
                     if row == col:  # Skip contacts of a mol with itself.
                         continue
-                    if (contact_map[row][col] != 0 and 
+                    if (contact_map[row, col] != 0 and
                         np.any(contact_map[col])):  # Contact of non-zero row.
                         new_contacts = True
                         contact_map[row] += contact_map[col]
@@ -469,7 +450,7 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
     # Periodic boundary conditions are applied after the offset.
 
     for i in range(pos_sel.shape[0]):
-            pos_i = pos_sel[i][bin_ax] - offset[bin_ax]
+            pos_i = pos_sel[i, bin_ax] - offset[bin_ax]
             if pos_i >= bin_hi:
                 pos_i -= bin_range
             if pos_i < bin_lo:
@@ -477,6 +458,11 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
             bin_idx = int(((pos_i / bin_range + 1 / 2) * nbins))
             if bin_idx < 0 or bin_idx >= nbins:
                 print('Error: invalid bin index created.')
+                bin_val.fill(0)
+                break
+                # TODO Put in a Numba friendly way of exiting the code instead
+                # of filling the bin_val array with zeros.
+                # exit(1)
             bin_val[bin_idx] += 1
 
     # Convert the binned particles to a density profile.
@@ -553,36 +539,3 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_ax, nbins,
 
     density_profile /= nframes
     return density_profile 
-
-
-# # @jit(nopython=True)
-# # def bead_heatmap(xyz, bead_list, fixed_dim, rcut, nbins, box_dims, img_flags):
-# #     """
-# #     Create a 2D heatmap showing the relative density of nearby beads. The
-# #     resolution of the heatmap cover the rij vector (which connects bead 1 to
-# #     bead 2) to a maximum of rcut, having free rotation in every dimension but
-# #     the fixed dimension given by fixed_dim.
-# #     
-# #     Args:
-# #         xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-# #              the dimensions are (in order) simulation frame, atom ID, and
-# #              xyz coordinates.
-# #         bead_list: 1D numpy array with the index of every bead of interest.
-# #         fixed_dim: Dimension to not allow rij to rotate in. Either x, y, or z.
-# #                    In the rij vector, it sets that dimension's component to 0.
-# #         rcut: maximum length for the rij vector.
-# #         nbins: ID of bins for a dimension of the rij vector.
-# #         box_dims: the xyz values of the simulation box stored as a 1D numpy
-# #                   array, where index 0 is the x-dimension, index 1 is the
-# #                   y-dimension, and index 2 is the z-dimension.
-# #         img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-# #                    (finish and test documentation later).
-# # 
-# #     Returns:
-# #         fig_heatmap, ax_heatmap: matplotlib figure and axes of the heatmap
-# #     """
-# #     
-# #     # TODO Make an rij matrix that is rij_matrix[ri_value][rj_value].
-# #     # TODO Go through each rij in the simulation and bin into a bin matrix (of
-# #     #      shape equal to rij_matrix). Find closest point.
-# #     # TODO Generate a heatmap from the bin matrix.
