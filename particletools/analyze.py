@@ -4,72 +4,74 @@
 Functions to analyze a particle based trajectory.
 '''
 
-# TODO Go through and change mol_data to being [mol_num][dimension] for
-# consistency.
-# TODO Go through and change [x][y][z] notation to [x, y, z]. 
+# TODO Expand functions that use box_config as an argument to use tilt factors.
 
 import numpy as np
 from math import sqrt
 from numba import jit
 
 @jit(nopython=True)
-def get_img_flags(xyz, box_dims):
+def img_flags_from_traj(traj_wrap, box_config):
     """
-    Calculate the image flags of a trajectory. This assumes that the dump
-    frequency is sufficiently high such that beads never travel more than half
-    the length of a box dimension.
+    Calculate the image flags of a wrapped particle-based trajectory. This 
+    assumes that the dump frequency is sufficiently high such that particles 
+    never travel more than half the length of a box dimension, otherwise image 
+    flags may be incorrect. Molecules that are spread across a periodic 
+    boundary will have incorrect image flags, potentially introducing errors in
+    other calculations. Assumes that the box dimensions are constant in time.
     
     Args:
-        xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-             the dimensions are (in order) simulation frame, atom number, and
-             xyz coordinates.
-        box_dims: the xyz values of the simulation box stored as a 1D numpy
-                  array, where index 0 is the x-dimension, index 1 is the
-                  y-dimension, and index 2 is the z-dimension.
+        traj_wrap: The wrapped trajectory of each particle stored as a 3D 
+                   numpy array with dimensions 'frame (ascending order) by 
+                   particle ID (ascending order) by particle position 
+                   (x, y, z)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz).
     Returns:
-        img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-                   (finish and test documentation later).
+        img_flags: The image flags of the particles across the trajectory
+                   stored as a 3D numpy array with dimensions 'frame (ascending
+                   order) by particle ID (ascending order) by particle image 
+                   flag (ix, iy, iz)'.
     """
-
-    # TODO Change the convention for image flags (make it cumulative sum).
-    # TODO Change the data type of img_flags and make it numba friendly,
-    # np.zeros(xyz.shape, dtype=int) does not work.
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
-    nframes = xyz.shape[0]
-    nbeads = xyz.shape[1]
-    img_flags = np.zeros(xyz.shape)
+    nframes = traj_wrap.shape[0]
+    nparticles = traj_wrap.shape[1]
+    lx, ly, lz = box_config[0:3]
+    img_flags = np.zeros(traj_wrap.shape, dtype=np.int32)
 
     # Loop through each frame but the first, since changes in position between
     # frames are needed to calculate image flags.
 
     for frame in range(1, nframes):
 
-        # Loop through each bead.
+        # Loop through each particle's index (index = ID - 1).
 
-        for bead_num in range(nbeads):
+        for idx in range(nparticles):
 
-            # Get the bead's change in position from the last frame
+            # Get the particle's change in position from the last frame
 
-            del_x = xyz[frame][bead_num][0] - xyz[frame - 1][bead_num][0]
-            del_y = xyz[frame][bead_num][1] - xyz[frame - 1][bead_num][1]
-            del_z = xyz[frame][bead_num][2] - xyz[frame - 1][bead_num][2]
+            del_x = traj_wrap[frame, idx, 0] - traj_wrap[frame - 1, idx, 0]
+            del_y = traj_wrap[frame, idx, 1] - traj_wrap[frame - 1, idx, 1]
+            del_z = traj_wrap[frame, idx, 2] - traj_wrap[frame - 1, idx, 2]
 
             # Store any periodic boundary crossings.
 
-            if del_x > box_dims[0] / 2:
-                img_flags[frame][bead_num][0] -= 1
-            if del_y > box_dims[1] / 2:
-                img_flags[frame][bead_num][1] -= 1
-            if del_z > box_dims[2] / 2:
-                img_flags[frame][bead_num][2] -= 1
-            if del_x < box_dims[0] / -2:
-                img_flags[frame][bead_num][0] += 1
-            if del_y < box_dims[1] / -2:
-                img_flags[frame][bead_num][1] += 1
-            if del_z < box_dims[2] / -2:
-                img_flags[frame][bead_num][2] += 1
+            if del_x > lx / 2:
+                img_flags[frame:, idx, 0] -= 1
+            if del_y > ly / 2:
+                img_flags[frame:, idx, 1] -= 1
+            if del_z > lz / 2:
+                img_flags[frame:, idx, 2] -= 1
+            if del_x < lx / -2:
+                img_flags[frame:, idx, 0] += 1
+            if del_y < ly / -2:
+                img_flags[frame:, idx, 1] += 1
+            if del_z < lz / -2:
+                img_flags[frame:, idx, 2] += 1
 
     # Return the image flags.
 
@@ -77,401 +79,463 @@ def get_img_flags(xyz, box_dims):
 
 
 @jit(nopython=True)
-def get_mol_com(xyz, beads_per_mol, box_dims, img_flags, mdata):
+def unwrap_traj(traj_wrap, box_config, img_flags):
     """
-    Get the center of mass for each molecule at every frame of a trajectory.
+    Calculate the unwrapped trajectory of a particle-based trajectory using the
+    trajectory's image flags and the simluation box configuration. Assumes that
+    the box dimensions are constant in time.
     
     Args:
-        xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-             the dimensions are (in order) simulation frame, atom number, and
-             xyz coordinates.
-        beads_per_mol: the number of particles per molecule stored as a 1D
-                       numpy array where the index equals the molecule number.
-        box_dims: the xyz values of the simulation box stored as a 1D numpy
-                  array, where index 0 is the x-dimension, index 1 is the
-                  y-dimension, and index 2 is the z-dimension.
-        img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-                   (finish and test documentation later).
-        mdata: 1D numpy array of particle masses where the index is particle 
-               ID.
-
+        traj_wrap: The wrapped trajectory of each particle stored as a 3D numpy
+                   array with dimensions 'frame (ascending order) by particle 
+                   ID (ascending order) by particle position (x, y, z)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+        img_flags: The image flags of the particles across the trajectory
+                   stored as a 3D numpy array with dimensions 'frame (ascending
+                   order) by particle ID (ascending order) by particle image 
+                   flag (ix, iy, iz)'.
     Returns:
-        mol_com: 2D numpy array with dimensions of frame and molecule ID, holds the
-                 value of the molecule's center of mass for a given frame.
+        traj_unwrap: The unwrapped trajectory of each particle stored as a 3D 
+                     numpy array with dimensions 'frame (ascending order) by 
+                     particle ID (ascending order) by particle position 
+                     (x, y, z)'.
     """
-
-    # TODO Finish and test docstring using Sphinx.
-    # TODO Better name than beads for particles? And are comments appropiate?
-    # TODO Importantly, there is a better way to structure these calculations
-    # by having optional arguments, so that unwrapping and building of mol_data
-    # is not done multiple times when going from get_mol -> calc_rg.
-    # TODO Make it so that it just takes coordinates, unwrapping done sep.
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
-    nframes = xyz.shape[0]
-    nmolec = beads_per_mol.shape[0]
-    largest_mol = np.amax(beads_per_mol)
-    mol_data = np.zeros((4, largest_mol))
-    mol_com = np.zeros((nframes, nmolec, 3))
+    nframes = traj_wrap.shape[0]
+    nparticles = traj_wrap.shape[1]
+    lx, ly, lz = box_config[0:3]
+    traj_unwrap = np.zeros(traj_wrap.shape)
 
-    # Loop through each frame.
+    # Loop through each frame. 
 
     for frame in range(nframes):
-        
-        # Loop through each molecule.
 
-        mol_start = 0
-        for mol_num in range(nmolec):
+        # Loop through each particle's index (index = ID - 1).
 
-            # Find the starting bead number for this molecule and the next.
+        for idx in range(nparticles):
 
-            mol_end = beads_per_mol[mol_num] + mol_start 
+            # Unwrap the particle's position based on the image flags and box
+            # configuration.
 
-            # Loop through each bead in the current molecule.
+            traj_unwrap[frame, idx, 0] = traj_wrap[frame, idx, 0] +\
+                                         img_flags[frame, idx, 0] * lx
+            traj_unwrap[frame, idx, 1] = traj_wrap[frame, idx, 1] +\
+                                         img_flags[frame, idx, 1] * ly
+            traj_unwrap[frame, idx, 2] = traj_wrap[frame, idx, 2] +\
+                                         img_flags[frame, idx, 2] * lz
 
-            for bead_num in range(mol_start, mol_end):
+    # Return the unwrapped trajectory.
 
-                # Unwrap the bead's coordinates and find its mass. 
-
-                x = xyz[frame][bead_num][0] +\
-                    np.sum(img_flags[:frame + 1, bead_num, 0]) *\
-                    box_dims[0]
-                y = xyz[frame][bead_num][1] +\
-                    np.sum(img_flags[:frame + 1, bead_num, 1]) *\
-                    box_dims[1]
-                z = xyz[frame][bead_num][2] +\
-                    np.sum(img_flags[:frame + 1, bead_num, 2]) *\
-                    box_dims[2]
-                mass = mdata[bead_num]
-
-                # Store the bead's unwrapped coordinates and mass with 
-                # other beads of the same molecule.
-
-                mol_data[0][bead_num - mol_start] = x
-                mol_data[1][bead_num - mol_start] = y
-                mol_data[2][bead_num - mol_start] = z
-                mol_data[3][bead_num - mol_start] = mass
-
-            # Calculate and store the molecule's center of mass.
-
-            mass_weighted_x = np.sum(mol_data[0] * mol_data[3])
-            mass_weighted_y = np.sum(mol_data[1] * mol_data[3])
-            mass_weighted_z = np.sum(mol_data[2] * mol_data[3])
-            total_mass = np.sum(mol_data[3])
-            mol_com[frame][mol_num][0] = mass_weighted_x / total_mass
-            mol_com[frame][mol_num][1] = mass_weighted_y / total_mass
-            mol_com[frame][mol_num][2] = mass_weighted_z / total_mass
-
-            # Update for the next molecule.
-
-            mol_start = mol_end
-            mol_data.fill(0)
-
-    return mol_com
+    return traj_unwrap
 
 
 @jit(nopython=True)
-def calc_rg(xyz, mol_com, beads_per_mol, box_dims, img_flags, mdata):
+def mol_com_from_frame(pos, molid, mass):
     """
-    Get the center of mass for each molecule at every frame of a trajectory.
+    Calculate the center of mass and mass of each molecule for a single frame 
+    of their trajectory.
     
     Args:
-        xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-             the dimensions are (in order) simulation frame, atom number, and
-             xyz coordinates.
-        beads_per_mol: the number of particles per molecule stored as a 1D
-                       numpy array where the index equals the molecule number.
-        box_dims: the xyz values of the simulation box stored as a 1D numpy
-                  array, where index 0 is the x-dimension, index 1 is the
-                  y-dimension, and index 2 is the z-dimension.
-        img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-                   (finish and test documentation later).
-        mdata: 1D numpy array of particle masses where the index is particle_ID.
-        mol_com: 2D numpy array with dimensions of frame and molecule ID, holds the
-                 value of the molecule's center of mass for a given frame.
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
 
     Returns:
-        calc_rg: 2D numpy array with dimensions of frame and molecule ID, holds the
-                 value of the molecule's radius of gyration for a given frame.
+        mol_com: The center of mass of each molecule stored as a 2D numpy array
+                 with dimensions 'molecule ID (ascending order) by molecule 
+                 center of mass (x, y, z)'.
+        mol_mass: The mass of each molecule stored as a 1D numpy array with
+                  dimension 'molecule ID (asecnding order)'.
     """
-
-    # TODO Finish and test docstring using Sphinx.
-    # TODO Better name than beads for particles? And are comments appropiate?
-    # TODO Better name than rg_data?
 
     # Get simulation parameters from the arguments and preallocate arrays.
 
-    nframes = xyz.shape[0]
-    nmolec = beads_per_mol.shape[0]
-    bead_xyz = np.zeros(3)
-    rg_data = np.zeros((nframes, nmolec))
+    mols = np.unique(molid)
+    mol_com = np.zeros((mols.shape[0], 3))
+    mol_mass = np.zeros(mols.shape[0])
 
-    # Loop through each frame.
+    # Calculate the mass weighted position of each particle.
 
-    for frame in range(nframes):
-        
-        # Loop through each molecule.
+    wt_pos = (pos.T * mass).T
 
-        mol_start = 0
-        for mol_num in range(nmolec):
+    # Loop through each molecule, find the corresponding particle indices, and
+    # then calculate the center of mass of the molecule.
 
-            # Find the starting bead number for this molecule and the next.
+    for mol in mols:
+        indices = np.where(molid == mol)
+        mol_idx = np.where(mols == mol)
+        mol_mass[mol_idx] = np.sum(mass[indices])
+        mol_com[mol_idx] = np.sum(wt_pos[indices], axis=0) / mol_mass[mol_idx]
 
-            mol_end = beads_per_mol[mol_num] + mol_start
-        
-            # Loop through each bead in the current molecule.
+    # Return the molecules' center of masses and masses.
 
-            rg_sum = 0
-            for bead_num in range(mol_start, mol_end):
-
-                # Unwrap the bead's coordinates. 
-
-                bead_xyz[0] = xyz[frame][bead_num][0] +\
-                              np.sum(img_flags[:frame + 1, bead_num, 0]) *\
-                              box_dims[0]
-                bead_xyz[1] = xyz[frame][bead_num][1] +\
-                              np.sum(img_flags[:frame + 1, bead_num, 1]) *\
-                              box_dims[1]
-                bead_xyz[2] = xyz[frame][bead_num][2] +\
-                              np.sum(img_flags[:frame + 1, bead_num, 2]) *\
-                              box_dims[2]
-
-                # Calculate the bead's squared distance from the molecule's
-                # center of mass.
-
-                dr = bead_xyz - mol_com[frame][mol_num]
-                rg_sum += np.dot(dr, dr)
-            
-            # Calculate the molecule's radius of gyration for the frame.
-
-            rg_data[frame][mol_num] = sqrt(rg_sum / beads_per_mol[mol_num])
-
-            # Update for the next molecule.
-
-            mol_start = mol_end 
-
-    return rg_data
+    return mol_com, mol_mass
 
 
 @jit(nopython=True)
-def profile_density(xyz, bead_sel, beads_per_mol, nbins, nsections, ccut,
-                    centering, box_dims, mdata):
-
-    # TODO Build docstring.
-    # TODO Implement clustering.
-    # TODO Have it use get_mol_com for slab centering.
-
-    # Filter the trajectory based on the selected beads.
+def mol_com_from_traj(traj, molid, mass):
+    """
+    Calculate the center of mass and mass of each molecule across their 
+    trajectory.
     
-    xyz_sel = xyz[:, bead_sel, :]
+    Args:
+        traj: The trajectory of each particle stored as a 3D numpy array with
+              dimensions 'frame (ascending order) by particle ID (ascending 
+              order) by particle position (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
 
-    # Find the longest dimension of the box, known as the slab dimension.
+    Returns:
+        traj_mol_com: The center of mass of each molecule across their 
+                      trajectory stored as a 2D numpy array with dimensions 
+                      'frame (ascending order) by molecule ID (ascending order)
+                      by molecule center of mass (x, y, z)'.
+        mol_mass: The mass of each molecule stored as a 1D numpy array with
+                  dimension 'molecule ID (asecnding order)'.
+    """
 
-    slab_length = max(box_dims)
-    slab_cross_section = 1
-    for i in range(0, len(box_dims)):
-        if box_dims[i] == slab_length:
-            slab_dim = i
-        else:
-            slab_cross_section *= box_dims[i]
-    slab_begin = slab_length / -2
-    slab_end = slab_length / 2
+    # Get simulation parameters from the arguments and preallocate arrays.
+    
+    nframes = traj.shape[0]
+    nmols = np.unique(molid).shape[0]
+    traj_mol_com = np.zeros((nframes, nmols, 3))
 
-    # Create histogram bins and dimension array.
+    # Loop through each frame and get the center of mass of each molecule.
 
-    bin_width = slab_length / nbins
-    bin_volume = bin_width * slab_cross_section
-    dimension = np.arange(slab_begin, slab_end, bin_width)
+    for frame in range(nframes):
+        mol_com, mol_mass = mol_com_from_frame(traj[frame], molid, mass)
+        traj_mol_com[frame] = mol_com
 
-    # Calculate the first frame to start, the frames per section, and prepare
-    # arrays for data storage.
+    # Return the molecules' center of masses over the trajectory and masses.
 
-    nframes = xyz.shape[0]
-    nbeads = xyz.shape[1]
-    frames_per_sec = nframes // nsections
-    frame_start = nframes - nsections * frames_per_sec
-    sec_num = 0
-    beads_per_bin = np.zeros((nsections, nbins))
-    slab_molecules_per_frame = np.zeros(nsections * frames_per_sec)
+    return traj_mol_com, mol_mass
+
+
+@jit(nopython=True)
+def rg_from_frame(pos, molid, mass, mol_com):
+    """
+    Calculate the radius of gyration of each molecule for a single frame of
+    their trajectory. The radius of gyration is the average distance between
+    the particles of a molecule and the molecule's center of mass.
+    
+    Args:
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+        mol_com: The center of mass of each molecule stored as a 2D numpy array
+                 with dimensions 'molecule ID (ascending order) by molecule 
+                 center of mass (x, y, z)'.
+
+    Returns:
+        rg: The radius of gyration of each molecule stored as a 1D numpy array
+            with dimension 'molecule ID (ascending order)'.
+    """
+
+    # Get simulation parameters from the arguments and preallocate arrays.
+
+    mols = np.unique(molid)
+    rg = np.zeros(mols.shape[0])
+
+    # Loop through each molecule, find the corresponding particle indices, and
+    # then calculate the radius of gyration of the molecule.
+
+    for mol in mols:
+        indices = np.where(molid == mol)[0]
+        mol_idx = np.where(mols == mol)
+        dr = (pos[indices] - mol_com[mol_idx]).flatten()
+        sq_dist = np.dot(dr, dr)
+        N = indices.shape[0]
+        sq_rg = sq_dist / N
+        rg[mol_idx] = sqrt(sq_rg)
+        
+    # Return the molecules' radii of gyration.
+
+    return rg
+
+
+@jit(nopython=True)
+def rg_from_traj(traj, molid, mass, traj_mol_com):
+    """
+    Calculate the radius of gyration of each molecule across their trajectory. 
+    The radius of gyration is the average distance between the particles of a 
+    molecule and the molecule's center of mass.
+    
+    Args:
+        traj: The trajectory of each particle stored as a 3D numpy array with
+              dimensions 'frame (ascending order) by particle ID (ascending 
+              order) by particle position (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+        traj_mol_com: The center of mass of each molecule across their
+                      trajectory stored as a 3D numpy array with dimensions 
+                      'frame (ascending order) by molecule ID (ascending order)
+                      by molecule center of mass (x, y, z)'.
+
+    Returns:
+        traj_rg: The radius of gyration of each molecule across their 
+                 trajectory stored as a 2D numpy array with dimensions 'frame 
+                 (ascending order) by molecule ID (ascending order)'.
+    """
+
+    # Get simulation parameters from the arguments and preallocate arrays.
+    
+    nframes = traj.shape[0]
+    nmols = np.unique(molid).shape[0]
+    traj_rg = np.zeros((nframes, nmols))
+
+    # Loop through each frame and get the radius of gyration of each molecule.
+
+    for frame in range(nframes):
+        traj_rg[frame] = rg_from_frame(traj[frame], molid, mass, 
+                                       traj_mol_com[frame])
+
+    # Return the molecules' radii of gyration over the trajectory.
+
+    return traj_rg
+
+
+@jit(nopython=True)
+def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins, 
+                       centering='NONE', ccut=350):
+    """
+    Calculate the density profile of the selected particles along a given axis
+    for a single frame.
+    
+    Args:
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+        selection: The selected particles chosen for this calculation stored as
+                   a 1D numpy array with dimension 'particle ID' (ascending 
+                   order). For example, for density_from_frame, the particles
+                   making up the density returned are just the selected 
+                   particles.
+        bin_ax: The axis along which bins are generated for counting particles.
+                In most cases, the bin_ax can have a value of 0 (x-axis), 1
+                (y-axis), or 2 (z-axis).
+        nbins: The number of bins to generate for counting particles.
+        centering: The centering method used when calculating the density
+                   profile. Centering can have values of 'NONE' (no centering
+                   is performed), 'SYSTEM' (all particle positions are shifted
+                   so that the system's center of mass is at the center of the
+                   profile), or 'SLAB' (all particle positions are shifted so
+                   that the largest cluster of particles is at the center of
+                   the profile).
+        ccut: The cluster cutoff used for determining clusters in the 'SLAB'
+              centering method. For efficiency, molecules are clustered
+              together instead of particles, and ccut is the maximum
+              distance a molecule can be from the closest molecule in the same
+              cluster.
+
+    Returns:
+        density_profile: The density profile of the selected particles along a
+                         given axis stored as a 2D numpy array with dimensions
+                         'bin index by bin properties (position along the axis,
+                         density at that position).
+    """
+
+    # Calculate the cross section along the bin dimension.
+
+    cross_section = 1
+    for dim in range(3):
+        if dim == bin_ax:
+            continue
+        cross_section *= box_config[dim]
+
+    # Create histogram bins along the bin dimension.
+
+    bin_range = box_config[bin_ax]
+    bin_lo = bin_range / -2
+    bin_hi = bin_range / 2
+    bin_width = bin_range / nbins
+    bin_vol = bin_width * cross_section
+    bin_pos = np.arange(bin_lo, bin_hi, bin_width)
+    bin_val = np.zeros(nbins)
+
+    # Define the offset to apply for centering.
+
     offset = np.zeros(3)
+    
+    # If the centering method is 'SYSTEM', then calculate the entire system's
+    # center of mass and set it as the offset.
 
-    # Get the center of mass and mass of each molecule if slab centering is 
-    # used and preallocate memory for arrays.
+    if centering == 'SYSTEM':
+        wt_pos = (pos.T * mass).T
+        offset = np.sum(wt_pos, axis=0) / np.sum(mass)
+
+    # If the centering method is 'SLAB', then calculate the center of mass of
+    # the largest cluster (referred to as the slab) and set it as the offset.
     
     if centering == 'SLAB':
-        nmolec = beads_per_mol.shape[0]
-        mol_com = np.zeros((nframes, nmolec, 3))
-        largest_mol = np.amax(beads_per_mol)
-        mol_data = np.zeros((4, largest_mol))
-        for frame in range(nframes):
-            mol_start = 0
-            for mol_num in range(nmolec):
-                mol_end = beads_per_mol[mol_num] + mol_start 
-                for bead_num in range(mol_start, mol_end):
-                    mol_data[0][bead_num - mol_start] = xyz[frame][bead_num][0]
-                    mol_data[1][bead_num - mol_start] = xyz[frame][bead_num][1]
-                    mol_data[2][bead_num - mol_start] = xyz[frame][bead_num][2]
-                    mol_data[3][bead_num - mol_start] = mdata[bead_num]
-                mass_weighted_x = np.sum(mol_data[0] * mol_data[3])
-                mass_weighted_y = np.sum(mol_data[1] * mol_data[3])
-                mass_weighted_z = np.sum(mol_data[2] * mol_data[3])
-                total_mass = np.sum(mol_data[3])
-                mol_com[frame][mol_num][0] = mass_weighted_x / total_mass
-                mol_com[frame][mol_num][1] = mass_weighted_y / total_mass
-                mol_com[frame][mol_num][2] = mass_weighted_z / total_mass
-                mol_start = mol_end
-                mol_data.fill(0)
-        mol_mass = np.zeros(nmolec)
-        beads_in_cluster = np.zeros(nmolec)
-        mol_start = 0
-        for mol_num in range(nmolec):
-            mol_end = beads_per_mol[mol_num] + mol_start
-            mol_mass[mol_num] = np.sum(mdata[mol_start : mol_end]) 
-            mol_start = mol_end
 
-    # Loop through each frame and bin particles. The center of mass determined
-    # by the method string is used as a baseline in the binning process.
-    
-    for frame in range(frame_start, nframes):
+        # Get the center of mass and mass of each molecule.
 
-        if centering == 'SYSTEM':
-            xdata = xyz[frame][:, 0]
-            ydata = xyz[frame][:, 1]
-            zdata = xyz[frame][:, 2]
-            mass_weighted_x = np.sum(xdata * mdata)
-            mass_weighted_y = np.sum(ydata * mdata)
-            mass_weighted_z = np.sum(zdata * mdata)
-            total_mass = np.sum(mdata)
-            offset[0] = mass_weighted_x / total_mass
-            offset[1] = mass_weighted_y / total_mass
-            offset[2] = mass_weighted_z / total_mass
+        mol_com, mol_mass = mol_com_from_frame(pos, molid, mass)
+
+        # Create a contact map of the molecules, which details whether a
+        # molecule is within the contact cutoff (ccut) of other molecules.
+
+        nmol = np.unique(molid).shape[0]
+        contact_map = np.zeros((nmol, nmol))
+        for i in range(nmol):                           
+            mol_i_pos = mol_com[i]                     
+            for j in range(i, nmol):                                                
+                if i == j:
+                    contact_map[i, j] += 1  # Contact of a mol with itself.
+                    continue
+                mol_j_pos = mol_com[j]
+                dr = mol_i_pos - mol_j_pos
+                dist = sqrt(np.dot(dr, dr))
+                if dist <= ccut:                        
+                    contact_map[i, j] += 1
+                    contact_map[j, i] += 1
+
+        # Compress the contact map by combining rows with shared contacts. This
+        # causes each row to represent a unique cluster.
         
-        # The slab method for calculating the positional offset for the system.
-        # Works by finding the largest cluster in the frame, and setting that
-        # cluster's center of mass to be the positional offset. Clusters are 
-        # determined by looking at the distance between the center of mass of 
-        # molecules.
-
-        if centering == 'SLAB':
-
-            # Find clusters based on the center of mass of molecules.
-
-            mol_x = mol_com[frame][:, 0]
-            mol_y = mol_com[frame][:, 1]
-            mol_z = mol_com[frame][:, 2]
-
-            # Create a contact of the molecules, which details whether a
-            # molecule is within the cluster cutoff (ccut) of other molecules.
-
-            contact_map = np.zeros((nmolec, nmolec))
-            for i in range(nmolec):                           
-                i_mol_pos = np.array([mol_x[i], mol_y[i], mol_z[i]])                      
-                for j in range(i, nmolec):                                                
-                    if i == j:
-                        contact_map[i][j] += 1
+        for row in range(contact_map.shape[0]):
+            new_contacts = True
+            while new_contacts:
+                new_contacts = False
+                for col in range(contact_map.shape[1]):
+                    if row == col:  # Skip contacts of a mol with itself.
                         continue
-                    j_mol_pos = np.array([mol_x[j], mol_y[j], mol_z[j]])                  
-                    dr = i_mol_pos - j_mol_pos
-                    distance = sqrt(np.dot(dr, dr))
-                    if distance <= ccut:                        
-                        contact_map[i][j] += 1
-                        contact_map[j][i] += 1
+                    if (contact_map[row, col] != 0 and
+                        np.any(contact_map[col])):  # Contact of non-zero row.
+                        new_contacts = True
+                        contact_map[row] += contact_map[col]
+                        contact_map[col].fill(0)
 
-            # Compress the contact map by combining rows with shared contacts.
-            # This causes each row to represent a unique cluster.
-            
-            for row in range(contact_map.shape[0]):
-                new_contacts = True
-                while new_contacts:
-                    new_contacts = False
-                    for col in range(contact_map.shape[1]):
-                        if row == col:  # Skip self-contacts.
-                            continue
-                        if (contact_map[row][col] != 0 and 
-                            np.any(contact_map[col])):  # Non-zero row contact.
-                            new_contacts = True
-                            contact_map[row] += contact_map[col]
-                            contact_map[col].fill(0)
+        # From the compressed contact map, find the largest cluster (i.e. the
+        # slab) and set the offset to the slab's center of mass.
 
-            # From the compressed contact map, find the largest cluster and
-            # set the positional offset to the cluster's center of mass.
+        cluster_sizes = np.count_nonzero(contact_map, axis=1)
+        slab = np.argmax(cluster_sizes)
+        slab_mols = np.nonzero(contact_map[slab])
+        wt_mol_com = (mol_com.T * mol_mass).T
+        offset = np.sum(wt_mol_com[slab_mols], axis=0) /\
+                 np.sum(mol_mass[slab_mols])
 
-            beads_in_cluster.fill(0)
-            cluster_sizes = np.count_nonzero(contact_map, axis=1)
-            largest_cluster_idx = np.argmax(cluster_sizes)
-            mass_weighted_x = 0
-            mass_weighted_y = 0
-            mass_weighted_z = 0
-            total_mass = 0
-            for col in range(contact_map.shape[1]):
-                if contact_map[largest_cluster_idx][col] != 0:
-                    mass_weighted_x += mol_x[col] * mol_mass[col]
-                    mass_weighted_y += mol_y[col] * mol_mass[col]
-                    mass_weighted_z += mol_z[col] * mol_mass[col]
-                    total_mass += mol_mass[col]
-            offset[0] = mass_weighted_x / total_mass
-            offset[1] = mass_weighted_y / total_mass
-            offset[2] = mass_weighted_z / total_mass
 
-        # For each particle of interest, apply the center of mass offset and 
-        # bin it. Periodic boundary conditions are applied when applicable.
-
-        for bead_num in range(xyz_sel.shape[1]):
-                bead_pos = xyz_sel[frame][bead_num][slab_dim] -\
-                           offset[slab_dim]
-                if bead_pos >= slab_end:
-                    bead_pos -= slab_length
-                if bead_pos < slab_begin:
-                    bead_pos += slab_length
-                bin_idx = int(((bead_pos / slab_length + 1 / 2) * nbins))
-                if bin_idx >= nbins or bin_idx < 0:
-                    print('Error: invalid bin index created.')
-                beads_per_bin[sec_num][bin_idx] += 1
-
-        # If a section is reached, increment the section number.
-
-        if (frame - frame_start + 1) % frames_per_sec == 0:
-            sec_num += 1
+    # Filter the particle positions based on the selection array. 
     
-    # Convert binned beads to concentration values and create density profiles.
+    pos_sel = pos[selection, :]
 
-    conc = beads_per_bin / frames_per_sec / bin_volume
-    density_profiles = np.zeros((nsections, nbins, 2))
-    for i in range(nsections):
-        density_profiles[i] = np.column_stack((dimension, conc[i]))
+    # For each selected particle, apply the center of mass offset and bin it.
+    # Periodic boundary conditions are applied after the offset.
 
-    return density_profiles
+    for i in range(pos_sel.shape[0]):
+            pos_i = pos_sel[i, bin_ax] - offset[bin_ax]
+            if pos_i >= bin_hi:
+                pos_i -= bin_range
+            if pos_i < bin_lo:
+                pos_i += bin_range
+            bin_idx = int(((pos_i / bin_range + 1 / 2) * nbins))
+            if bin_idx < 0 or bin_idx >= nbins:
+                print('Error: invalid bin index created.')
+                bin_val.fill(0)
+                break
+                # TODO Put in a Numba friendly way of exiting the code instead
+                # of filling the bin_val array with zeros.
+                # exit(1)
+            bin_val[bin_idx] += 1
+
+    # Convert the binned particles to a density profile.
+
+    bin_conc = bin_val / bin_vol
+    density_profile = np.column_stack((bin_pos, bin_conc))
+
+    # Return the density profile across the desired dimension of the box.
+
+    return density_profile
 
 
-# @jit(nopython=True)
-# def bead_heatmap(xyz, bead_list, fixed_dim, rcut, nbins, box_dims, img_flags):
-#     """
-#     Create a 2D heatmap showing the relative density of nearby beads. The
-#     resolution of the heatmap cover the rij vector (which connects bead 1 to
-#     bead 2) to a maximum of rcut, having free rotation in every dimension but
-#     the fixed dimension given by fixed_dim.
-#     
-#     Args:
-#         xyz: the coordinates of a trajectory stored as a 3D numpy array, where
-#              the dimensions are (in order) simulation frame, atom number, and
-#              xyz coordinates.
-#         bead_list: 1D numpy array with the index of every bead of interest.
-#         fixed_dim: Dimension to not allow rij to rotate in. Either x, y, or z.
-#                    In the rij vector, it sets that dimension's component to 0.
-#         rcut: maximum length for the rij vector.
-#         nbins: number of bins for a dimension of the rij vector.
-#         box_dims: the xyz values of the simulation box stored as a 1D numpy
-#                   array, where index 0 is the x-dimension, index 1 is the
-#                   y-dimension, and index 2 is the z-dimension.
-#         img_flags: the trajectory's image flags stored as a 3D numpy array ... 
-#                    (finish and test documentation later).
-# 
-#     Returns:
-#         fig_heatmap, ax_heatmap: matplotlib figure and axes of the heatmap
-#     """
-#     
-#     # TODO Make an rij matrix that is rij_matrix[ri_value][rj_value].
-#     # TODO Go through each rij in the simulation and bin into a bin matrix (of
-#     #      shape equal to rij_matrix). Find closest point.
-#     # TODO Generate a heatmap from the bin matrix.
+@jit(nopython=True)
+def density_from_traj(traj, molid, mass, box_config, selection, bin_ax, nbins,
+                      centering='NONE', ccut=350):
+    """
+    Calculate the average density profile of the selected particles along a 
+    given axis over their trajectory.
+    
+    Args:
+        traj: The trajectory of each particle stored as a 3D numpy array with
+              dimensions 'frame (ascending order) by particle ID (ascending 
+              order) by particle position (x, y, z)'.
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+        selection: The selected particles chosen for this calculation stored as
+                   a 1D numpy array with dimension 'particle ID' (ascending 
+                   order). For example, for density_from_frame, the particles
+                   making up the density returned are just the selected 
+                   particles.
+        bin_ax: The axis along which bins are generated for counting particles.
+                In most cases, the bin_ax can have a value of 0 (x-axis), 1
+                (y-axis), or 2 (z-axis).
+        nbins: The number of bins to generate for counting particles.
+        centering: The centering method used when calculating the density
+                   profile. Centering can have values of 'NONE' (no centering
+                   is performed), 'SYSTEM' (all particle positions are shifted
+                   so that the system's center of mass is at the center of the
+                   profile), or 'SLAB' (all particle positions are shifted so
+                   that the largest cluster of particles is at the center of
+                   the profile).
+        ccut: The cluster cutoff used for determining clusters in the 'SLAB'
+              centering method. For efficiency, molecules are clustered
+              together instead of particles, and ccut is the maximum
+              distance a molecule can be from the closest molecule in the same
+              cluster.
+
+    Returns:
+        density_profile: The density profile of the selected particles along a
+                         given axis stored as a 2D numpy array with dimensions
+                         'bin index by bin properties (position along the axis,
+                         density at that position).
+    """
+    # Get the number of simulation frames and preallocate a density profile.
+    
+    nframes = traj.shape[0]
+    density_profile = np.zeros((nbins, 2))
+
+    # Loop through each frame and sum the density profiles.
+
+    for frame in range(nframes):
+        pos = traj[frame]
+        density_profile += density_from_frame(pos, molid, mass, box_config,
+                                              selection, bin_ax, nbins,
+                                              centering, ccut)
+
+    # Return the average density profile over the frames.
+
+    density_profile /= nframes
+    return density_profile 
