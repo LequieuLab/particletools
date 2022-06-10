@@ -312,8 +312,8 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
 
 
 @jit(nopython=True)
-def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins, 
-                       centering='NONE', ccut=350):
+def density_from_frame(pos, molid, mass, box_config, selection, bin_axis, 
+                       nbins, centering='NONE', ccut=350):
     """
     Calculate the density profile of the selected particles along a given axis
     for a single frame.
@@ -335,9 +335,9 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
                    order). For example, for density_from_frame, the particles
                    making up the density returned are just the selected 
                    particles.
-        bin_ax: The axis along which bins are generated for counting particles.
-                In most cases, the bin_ax can have a value of 0 (x-axis), 1
-                (y-axis), or 2 (z-axis).
+        bin_axis: The axis along which bins are generated for counting 
+                  particles. In most cases, the bin_axis can have a value of 0 
+                  (x-axis), 1 (y-axis), or 2 (z-axis).
         nbins: The number of bins to generate for counting particles.
         centering: The centering method used when calculating the density
                    profile. Centering can have values of 'NONE' (no centering
@@ -363,13 +363,13 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
 
     cross_section = 1
     for dim in range(3):
-        if dim == bin_ax:
+        if dim == bin_axis:
             continue
         cross_section *= box_config[dim]
 
     # Create histogram bins along the bin dimension.
 
-    bin_range = box_config[bin_ax]
+    bin_range = box_config[bin_axis]
     bin_lo = bin_range / -2
     bin_hi = bin_range / 2
     bin_width = bin_range / nbins
@@ -450,7 +450,7 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
     # Periodic boundary conditions are applied after the offset.
 
     for i in range(pos_sel.shape[0]):
-            pos_i = pos_sel[i, bin_ax] - offset[bin_ax]
+            pos_i = pos_sel[i, bin_axis] - offset[bin_axis]
             if pos_i >= bin_hi:
                 pos_i -= bin_range
             if pos_i < bin_lo:
@@ -476,8 +476,8 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_ax, nbins,
 
 
 @jit(nopython=True)
-def density_from_traj(traj, molid, mass, box_config, selection, bin_ax, nbins,
-                      centering='NONE', ccut=350):
+def density_from_traj(traj, molid, mass, box_config, selection, bin_axis, 
+                      nbins, centering='NONE', ccut=350):
     """
     Calculate the average density profile of the selected particles along a 
     given axis over their trajectory.
@@ -499,9 +499,9 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_ax, nbins,
                    order). For example, for density_from_frame, the particles
                    making up the density returned are just the selected 
                    particles.
-        bin_ax: The axis along which bins are generated for counting particles.
-                In most cases, the bin_ax can have a value of 0 (x-axis), 1
-                (y-axis), or 2 (z-axis).
+        bin_axis: The axis along which bins are generated for counting 
+                  particles. In most cases, the bin_axis can have a value of 0 
+                  (x-axis), 1 (y-axis), or 2 (z-axis).
         nbins: The number of bins to generate for counting particles.
         centering: The centering method used when calculating the density
                    profile. Centering can have values of 'NONE' (no centering
@@ -532,10 +532,116 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_ax, nbins,
     for frame in range(nframes):
         pos = traj[frame]
         density_profile += density_from_frame(pos, molid, mass, box_config,
-                                              selection, bin_ax, nbins,
+                                              selection, bin_axis, nbins,
                                               centering, ccut)
 
     # Return the average density profile over the frames.
 
     density_profile /= nframes
     return density_profile 
+
+
+@jit(nopython=True)
+def meshgrid3D(x, y, z):
+    """
+    Create a 3D mesh and return the gridpoints of that mesh for the x, y, and z
+    axes. Analagous to np.meshgrid(x, y, z, indexing='ij'), except meshgrid3D
+    is compatible with Numba's jit compilation in nopython mode.
+    
+    Args:
+        x: The x-axis values of the 3D mesh stored as a 1D numpy array with
+           dimension 'x-index'.
+        y: The y-axis values of the 3D mesh stored as a 1D numpy array with
+           dimension 'y-index'.
+        z: The z-axis values of the 3D mesh stored as a 1D numpy array with
+           dimension 'z-index'.
+
+    Returns:
+        grid: The gridpoint values of each axis in the 3D mesh stored as a list
+              of 3D numpy arrays. The list has dimension 'axis (x, y, z)', and
+              each 3D numpy array stores the value of that axis at every
+              gridpoint, having dimensions 'x-index by y-index by z-index'.
+    """
+    
+    # TODO Replace this with an n-dimensional version.
+
+    # Preallocate each 3D numpy array.
+
+    shape = (x.size, y.size, z.size)
+    xv = np.zeros(shape)
+    yv = np.zeros(shape)
+    zv = np.zeros(shape)
+
+    # Store the values of each axis at each gridpoint in their respective 
+    # array, and then store the arrays together as a list.
+
+    for i in range(x.size):
+        for j in range(y.size):
+            for k in range(z.size):
+                xv[i, j, k] = x[i] 
+                yv[i, j, k] = y[j]
+                zv[i, j, k] = z[k]
+    grid = [xv, yv, zv]
+
+    # Return the gridpoint values of each axis in the 3D mesh.
+
+    return grid
+
+
+@jit(nopython=True)
+def rijavg_from_frame(pos, box_config, rcut, ngpoints, f='count', *fargs):
+    """
+    For a single frame, calculate the average value of the function f over 
+    particles separated by a vector rij. By default, f is the particle count, 
+    and so rij_avg_from_frame returns the average number of particles separated
+    from another particle by a vector rij. rij is equal to the position vector
+    of particle j minus the position vector of particle i.
+    
+    Args:
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+        rcut: The rij vector cutoff used to determine the maximum length the
+              rij vector can be along a single axis. Due to the minimum image 
+              convention, rcut cannot be greater than the shortest simulation 
+              box length.
+        ngpoints: The number of gridpoints per axis stored as a 1D numpy array
+                  with dimension 'axis (x, y, z)'.
+        f: The function to be averaged over. f is by default the particle
+           count, but it can be any user defined function. For compatibility
+           with Numba's just-in-time (jit) compiler, this function should also
+           have be jit compiled in nopython mode.
+        fargs: The functional arguments for f. For example, if f uses particle
+               orientations, fargs could contain a 2D numpy array with
+               dimensions 'particle ID (ascending order) by particle quaternion
+               (r, ax, ay, az)'.
+
+    Returns:
+        rijgrid: The gridpoint values of each axis in the 3D mesh that the rij 
+                 vector is defined within stored as a list of 3D numpy arrays. 
+                 The list has dimension 'axis (x, y, z)', and each 3D numpy 
+                 array stores the value of that axis at every gridpoint, having
+                 dimensions 'x-index by y-index by z-index'.
+        rijavg: The average value of the function f over particles separated by
+                a vector rij stored as a 3D numpy array with dimensions
+                'x-index by y-index by z-index', where these indices correspond
+                to the indices of rijgrid.
+    """
+
+    # Generate the rij gridpoints.
+    
+    x_gpoints = np.linspace(box_config[0] / -2, box_config[0] / 2, ngpoints[0])
+    y_gpoints = np.linspace(box_config[1] / -2, box_config[1] / 2, ngpoints[1])
+    z_gpoints = np.linspace(box_config[2] / -2, box_config[2] / 2, ngpoints[2])
+    rijgrid = meshgrid3D(x_gpoints, y_gpoints, z_gpoints)
+
+    # Return the rij grid points and rij averaged value of function 'f'.
+
+    rijavg = 0  # Temp value.
+    return rijgrid, rijavg
+
+
