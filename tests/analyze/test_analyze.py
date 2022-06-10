@@ -228,6 +228,10 @@ class TestAnalyzeFunctions(unittest.TestCase):
 
     def test_density_from_frame(self):
 
+        # Define an orthogonal simulation box configuration.
+
+        box_config = np.asarray([10, 1, 50, 0, 0, 0])
+
         # Define the positions, molecule IDs, and masses of the particles.
 
         pos =     [[-3.4,    0,    0],  
@@ -248,12 +252,12 @@ class TestAnalyzeFunctions(unittest.TestCase):
         molid = np.asarray(molid)
         mass = np.asarray(mass)
 
-        # Define an orthogonal box configuration, a selection array, the bin
-        # dimension, the number of bins, and the cluster cutoff.
+        # Define a selection array, the bin axis, the number of bins, and the 
+        # cluster cutoff.
 
         box_config = [10, 1, 50, 0, 0, 0]
         selection = [0, 2, 3, 4, 5, 6, 7, 8, 11]
-        bin_ax = 0
+        bin_axis = 0
         nbins = 10
         ccut = 2
         box_config = np.asarray(box_config)
@@ -276,7 +280,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         density_profile[:, 1] /= 50
         test_density_profile = pt.density_from_frame(pos, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_ax, nbins, 'NONE', 
+                                                     bin_axis, nbins, 'NONE', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
@@ -297,7 +301,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         density_profile[:, 1] /= 50
         test_density_profile = pt.density_from_frame(pos, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_ax, nbins, 'SYSTEM', 
+                                                     bin_axis, nbins, 'SYSTEM', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
@@ -318,11 +322,15 @@ class TestAnalyzeFunctions(unittest.TestCase):
         density_profile[:, 1] /= 50
         test_density_profile = pt.density_from_frame(pos, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_ax, nbins, 'SLAB', 
+                                                     bin_axis, nbins, 'SLAB', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
     def test_density_from_traj(self):
+
+        # Define an orthogonal simulation box configuration.
+
+        box_config = np.asarray([3, 20, 50, 0, 0, 0])
 
         # Define the trajectory, molecule IDs, and masses of the particles.
 
@@ -343,15 +351,13 @@ class TestAnalyzeFunctions(unittest.TestCase):
         molid = np.asarray(molid)
         mass = np.asarray(mass)
 
-        # Define an orthogonal box configuration, a selection array, the bin
-        # dimension, the number of bins, and the cluster cutoff.
+        # Define a selection array, the bin axis, the number of bins, and the 
+        # cluster cutoff.
 
-        box_config = [3, 20, 50, 0, 0, 0]
         selection = [1, 2, 3]
-        bin_ax = 1
+        bin_axis = 1
         nbins = 10
         ccut = 10
-        box_config = np.asarray(box_config)
         selection = np.asarray(selection)
 
         # For the 'NONE' centering method, define the density profile and test
@@ -371,7 +377,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         density_profile[:, 1] /= (3 * 50 * 20 / 10)
         test_density_profile = pt.density_from_traj(traj, molid, mass,
                                                     box_config, selection,
-                                                    bin_ax, nbins, 'NONE', 
+                                                    bin_axis, nbins, 'NONE', 
                                                     ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
@@ -392,7 +398,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         density_profile[:, 1] /= (3 * 50 * 20 / 10)
         test_density_profile = pt.density_from_traj(traj, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_ax, nbins, 'SYSTEM', 
+                                                     bin_axis, nbins, 'SYSTEM', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
 
@@ -413,9 +419,194 @@ class TestAnalyzeFunctions(unittest.TestCase):
         density_profile[:, 1] /= (3 * 50 * 20 / 10)
         test_density_profile = pt.density_from_traj(traj, molid, mass, 
                                                      box_config, selection, 
-                                                     bin_ax, nbins, 'SLAB', 
+                                                     bin_axis, nbins, 'SLAB', 
                                                      ccut)
         self.assertTrue((test_density_profile == density_profile).all())
+
+    def test_meshgrid3D(self):
+
+        # Define the x-axis, y-axis, and z-axis values.
+
+        x = np.linspace( 0, 1, 2)
+        y = np.linspace(-1, 1, 3)
+        z = np.linspace( 0, 3, 4)
+
+        # Define the gridpoint values of each axis in the 3D mesh.
+
+        xv = [[[ 0,  0,  0,  0],
+               [ 0,  0,  0,  0],
+               [ 0,  0,  0,  0]],
+              [[ 1,  1,  1,  1],
+               [ 1,  1,  1,  1],
+               [ 1,  1,  1,  1]]]
+        yv = [[[-1, -1, -1, -1],
+               [ 0,  0,  0,  0],
+               [ 1,  1,  1,  1]],
+              [[-1, -1, -1, -1],
+               [ 0,  0,  0,  0],
+               [ 1,  1,  1,  1]]]
+        zv = [[[ 0,  1,  2,  3],
+               [ 0,  1,  2,  3],
+               [ 0,  1,  2,  3]],
+              [[ 0,  1,  2,  3],
+               [ 0,  1,  2,  3],
+               [ 0,  1,  2,  3]]]
+        grid = [xv, yv, zv]
+
+        # Test meshgrid3D to see if it returns the correct values. Grids are 
+        # compared as numpy arrays for ease of testing.
+
+        test_grid = pt.meshgrid3D(x, y, z)
+        grid = np.asarray(grid)
+        test_grid = np.asarray(test_grid)
+        self.assertTrue((test_grid == grid).all())
+
+    def test_rijavg_from_frame(self):
+
+        # Define an orthogonal simulation box configuration.
+
+        box_config = np.asarray([8, 6, 8, 0, 0, 0])
+
+        # Define the positions and quaternions of particles.
+
+        pos =  [[    3,    -2,     1],
+                [    3,     2,     1],
+                [    2,    -1,     0],
+                [   -3,     2,     0]]
+        quat = [[    0,     0,     0,     0],
+                [    0,     0,     0,     0],
+                [    0,     0,     0,     0],
+                [    0,     0,     0,     0],
+                [    0,     0,     0,     0]]
+        pos = np.asarray(pos)
+        quat = np.asarray(quat)
+                
+        # Define the rij vector cutoff and the number of grind points per axis.
+
+        rcut = 400
+        ngpoints = np.asarray([5, 7, 3])
+
+        # Define the rij grid and rij average for the default function
+        # (particle count).
+
+        xv = [[[ -4, -4, -4],
+               [ -4, -4, -4],
+               [ -4, -4, -4],
+               [ -4, -4, -4],
+               [ -4, -4, -4],
+               [ -4, -4, -4],
+               [ -4, -4, -4]],
+              [[ -2, -2, -2],
+               [ -2, -2, -2],
+               [ -2, -2, -2],
+               [ -2, -2, -2],
+               [ -2, -2, -2],
+               [ -2, -2, -2],
+               [ -2, -2, -2]],
+              [[  0,  0,  0],
+               [  0,  0,  0],
+               [  0,  0,  0],
+               [  0,  0,  0],
+               [  0,  0,  0],
+               [  0,  0,  0],
+               [  0,  0,  0]],
+              [[  2,  2,  2],
+               [  2,  2,  2],
+               [  2,  2,  2],
+               [  2,  2,  2],
+               [  2,  2,  2],
+               [  2,  2,  2],
+               [  2,  2,  2]],
+              [[  4,  4,  4],
+               [  4,  4,  4],
+               [  4,  4,  4],
+               [  4,  4,  4],
+               [  4,  4,  4],
+               [  4,  4,  4],
+               [  4,  4,  4]]]
+        yv = [[[ -3, -3, -3],
+               [ -2, -2, -2],
+               [ -1, -1, -1],
+               [  0,  0,  0],
+               [  1,  1,  1],
+               [  2,  2,  2],
+               [  3,  3,  3]],
+              [[ -3, -3, -3],
+               [ -2, -2, -2],
+               [ -1, -1, -1],
+               [  0,  0,  0],
+               [  1,  1,  1],
+               [  2,  2,  2],
+               [  3,  3,  3]],
+              [[ -3, -3, -3],
+               [ -2, -2, -2],
+               [ -1, -1, -1],
+               [  0,  0,  0],
+               [  1,  1,  1],
+               [  2,  2,  2],
+               [  3,  3,  3]],
+              [[ -3, -3, -3],
+               [ -2, -2, -2],
+               [ -1, -1, -1],
+               [  0,  0,  0],
+               [  1,  1,  1],
+               [  2,  2,  2],
+               [  3,  3,  3]],
+              [[ -3, -3, -3],
+               [ -2, -2, -2],
+               [ -1, -1, -1],
+               [  0,  0,  0],
+               [  1,  1,  1],
+               [  2,  2,  2],
+               [  3,  3,  3]]]
+        zv = [[[ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4]],
+              [[ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4]],
+              [[ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4]],
+              [[ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4]],
+              [[ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4],
+               [ -4,  0,  4]]]
+        rijgrid = [xv, yv, zv]
+
+        # For the default particle count function, define the rij averaged
+        # values and test rijavg_from_frame to see if it returns the correct
+        # values. Grids are compared as numpy arrays for ease of testing.
+
+        test_rijgrid, test_rijavg = pt.rijavg_from_frame(pos, box_config, rcut, 
+                                                         ngpoints)
+        rijgrid = np.asarray(rijgrid)
+        test_rijgrid = np.asarray(test_rijgrid)
+        self.assertTrue((test_rijgrid == rijgrid).all())
+        # self.assertTrue((test_rijavg == rijavg).all())
+        
 
 if __name__ == '__main__':
     unittest.main()
