@@ -60,18 +60,9 @@ def img_flags_from_traj(traj_wrap, box_config):
 
             # Store any periodic boundary crossings.
 
-            if del_x > lx / 2:
-                img_flags[frame:, idx, 0] -= 1
-            if del_y > ly / 2:
-                img_flags[frame:, idx, 1] -= 1
-            if del_z > lz / 2:
-                img_flags[frame:, idx, 2] -= 1
-            if del_x < lx / -2:
-                img_flags[frame:, idx, 0] += 1
-            if del_y < ly / -2:
-                img_flags[frame:, idx, 1] += 1
-            if del_z < lz / -2:
-                img_flags[frame:, idx, 2] += 1
+            img_flags[frame:, idx, 0] += int(-2 * del_x / lx)
+            img_flags[frame:, idx, 1] += int(-2 * del_y / ly)
+            img_flags[frame:, idx, 2] += int(-2 * del_z / lz)
 
     # Return the image flags.
 
@@ -441,7 +432,6 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_axis,
         offset = np.sum(wt_mol_com[slab_mols], axis=0) /\
                  np.sum(mol_mass[slab_mols])
 
-
     # Filter the particle positions based on the selection array. 
     
     pos_sel = pos[selection, :]
@@ -588,14 +578,12 @@ def meshgrid3D(x, y, z):
     return grid
 
 
-@jit(nopython=True)
-def rijavg_from_frame(pos, box_config, rcut, ngpoints, f='count', *fargs):
+# @jit(nopython=True)
+def rijavg_from_frame(pos, box_config, rcut, ngpoints):
     """
-    For a single frame, calculate the average value of the function f over 
-    particles separated by a vector rij. By default, f is the particle count, 
-    and so rij_avg_from_frame returns the average number of particles separated
-    from another particle by a vector rij. rij is equal to the position vector
-    of particle j minus the position vector of particle i.
+    For a single frame, calculate the average number of particles separated by
+    a vector rij. rij is equal to the position vector of particle j minus the
+    position vector of particle i.
     
     Args:
         pos: The position of each particle stored as a 2D numpy array with
@@ -611,37 +599,70 @@ def rijavg_from_frame(pos, box_config, rcut, ngpoints, f='count', *fargs):
               box length.
         ngpoints: The number of gridpoints per axis stored as a 1D numpy array
                   with dimension 'axis (x, y, z)'.
-        f: The function to be averaged over. f is by default the particle
-           count, but it can be any user defined function. For compatibility
-           with Numba's just-in-time (jit) compiler, this function should also
-           have be jit compiled in nopython mode.
-        fargs: The functional arguments for f. For example, if f uses particle
-               orientations, fargs could contain a 2D numpy array with
-               dimensions 'particle ID (ascending order) by particle quaternion
-               (r, ax, ay, az)'.
 
     Returns:
-        rijgrid: The gridpoint values of each axis in the 3D mesh that the rij 
-                 vector is defined within stored as a list of 3D numpy arrays. 
+        rijgrid: The gridpoint values of each axis in the 3D mesh, that the rij 
+                 vector is placed on, stored as a list of 3D numpy arrays. 
                  The list has dimension 'axis (x, y, z)', and each 3D numpy 
                  array stores the value of that axis at every gridpoint, having
                  dimensions 'x-index by y-index by z-index'.
-        rijavg: The average value of the function f over particles separated by
-                a vector rij stored as a 3D numpy array with dimensions
-                'x-index by y-index by z-index', where these indices correspond
-                to the indices of rijgrid.
+        rijavg: The average number of particles separated by a vector rij
+                stored as a 3D numpy array with dimensions 'x-index by y-index 
+                by z-index', where these indices are the indices of the rij
+                vector placed on the 3D mesh defined by rijgrid.
     """
-
-    # Generate the rij gridpoints.
     
-    x_gpoints = np.linspace(box_config[0] / -2, box_config[0] / 2, ngpoints[0])
-    y_gpoints = np.linspace(box_config[1] / -2, box_config[1] / 2, ngpoints[1])
-    z_gpoints = np.linspace(box_config[2] / -2, box_config[2] / 2, ngpoints[2])
+    # Get simulation parameters from the arguments and limit rcut if needed.
+
+    lx, ly, lz = box_config[0:3]
+    rcut_lim = min(box_config[0:3]) / 2
+    if rcut > rcut_lim:
+        rcut = rcut_lim
+
+    # Generate the rij gridpoints and preallocate rijavg.
+    
+    x_gpoints = np.linspace(lx / -2, lx / 2, ngpoints[0])
+    y_gpoints = np.linspace(ly / -2, ly / 2, ngpoints[1])
+    z_gpoints = np.linspace(lz / -2, lz / 2, ngpoints[2])
     rijgrid = meshgrid3D(x_gpoints, y_gpoints, z_gpoints)
+    rijavg = np.zeros(rijgrid[0].shape)
 
-    # Return the rij grid points and rij averaged value of function 'f'.
+    # Loop through each pair of particles and place the rij vector on the grid.
 
-    rijavg = 0  # Temp value.
+    nparticles = pos.shape[0]
+    for i in range(nparticles - 1):
+        for j in range(i + 1, nparticles):
+
+            # Get the rij vector and apply the minimum image convention.
+            
+            rij = pos[j] - pos[i]
+            rij[0] += int(-2 * rij[0] / lx) * lx
+            rij[1] += int(-2 * rij[1] / ly) * ly
+            rij[2] += int(-2 * rij[2] / lz) * lz
+
+            # Place the rij vector (and its additive inverse representing the
+            # reverse order in pairing rji) on the nearest gridpoint.
+
+            x_ind = round((rij[0] - x_gpoints[0]) * (ngpoints[0] - 1) / lx)
+            y_ind = round((rij[1] - y_gpoints[0]) * (ngpoints[1] - 1) / ly)
+            z_ind = round((rij[2] - z_gpoints[0]) * (ngpoints[2] - 1) / lz)
+            rijavg[x_ind, y_ind, z_ind] += 1
+
+            # Place the rji vector (which represents the reverse order in
+            # pairing) on the nearest gridpoint.
+
+            rji = -1 * rij
+            x_ind = round((rji[0] - x_gpoints[0]) * (ngpoints[0] - 1) / lx)
+            y_ind = round((rji[1] - y_gpoints[0]) * (ngpoints[1] - 1) / ly)
+            z_ind = round((rji[2] - z_gpoints[0]) * (ngpoints[2] - 1) / lz)
+            rijavg[x_ind, y_ind, z_ind] += 1
+
+    # Go from a count of particles to an average of particles.
+
+    rijavg /= nparticles * (nparticles - 1)
+
+    # Return the rij gridpoints and average number of particles at rij.
+
     return rijgrid, rijavg
 
 
