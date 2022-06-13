@@ -547,10 +547,9 @@ def meshgrid3D(x, y, z):
            dimension 'z-index'.
 
     Returns:
-        grid: The gridpoint values of each axis in the 3D mesh stored as a list
-              of 3D numpy arrays. The list has dimension 'axis (x, y, z)', and
-              each 3D numpy array stores the value of that axis at every
-              gridpoint, having dimensions 'x-index by y-index by z-index'.
+        grid: The gridpoint values of each axis in the 3D mesh stored as a 4D
+              numpy array with dimension 'axis (x, y, z) by x-index by y-index 
+              by z-index'.
     """
     
     # TODO Replace this with an n-dimensional version.
@@ -562,8 +561,8 @@ def meshgrid3D(x, y, z):
     yv = np.zeros(shape)
     zv = np.zeros(shape)
 
-    # Store the values of each axis at each gridpoint in their respective 
-    # array, and then store the arrays together as a list.
+    # Store the values of each axis at each gridpoint in their respective 3D
+    # array, and then store the arrays together as a 4D array.
 
     for i in range(x.size):
         for j in range(y.size):
@@ -571,19 +570,19 @@ def meshgrid3D(x, y, z):
                 xv[i, j, k] = x[i] 
                 yv[i, j, k] = y[j]
                 zv[i, j, k] = z[k]
-    grid = [xv, yv, zv]
+    grid = np.stack((xv, yv, zv), axis=0)
 
     # Return the gridpoint values of each axis in the 3D mesh.
 
     return grid
 
 
-# @jit(nopython=True)
-def rijavg_from_frame(pos, box_config, rcut, ngpoints):
+@jit(nopython=True)
+def rijcnt_from_frame(pos, box_config, rijgrid, rcut):
     """
-    For a single frame, calculate the average number of particles separated by
-    a vector rij. rij is equal to the position vector of particle j minus the
-    position vector of particle i.
+    For a single frame, count the number of particles separated by a vector
+    rij. rij is equal to the position vector of particle j minus the position
+    vector of particle i.
     
     Args:
         pos: The position of each particle stored as a 2D numpy array with
@@ -593,46 +592,40 @@ def rijavg_from_frame(pos, box_config, rcut, ngpoints):
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz)'.
+        rijgrid: The gridpoint values of each axis in the 3D mesh, that the rij
+                 vector is placed on, stored as a 4D numpy array with dimension
+                 'axis (x, y, z) by x-index by y-index by z-index'.
         rcut: The rij vector cutoff used to determine the maximum length the
               rij vector can be along a single axis. Due to the minimum image 
               convention, rcut cannot be greater than the shortest simulation 
               box length.
-        ngpoints: The number of gridpoints per axis stored as a 1D numpy array
-                  with dimension 'axis (x, y, z)'.
 
     Returns:
-        rijgrid: The gridpoint values of each axis in the 3D mesh, that the rij 
-                 vector is placed on, stored as a list of 3D numpy arrays. 
-                 The list has dimension 'axis (x, y, z)', and each 3D numpy 
-                 array stores the value of that axis at every gridpoint, having
-                 dimensions 'x-index by y-index by z-index'.
-        rijavg: The average number of particles separated by a vector rij
-                stored as a 3D numpy array with dimensions 'x-index by y-index 
-                by z-index', where these indices are the indices of the rij
-                vector placed on the 3D mesh defined by rijgrid.
+        rijcnt: The number of particles separated by a vector rij stored as a
+                3D numpy array with dimensions 'x-index by y-index by z-index',
+                where these indices are the indices of the rij vector placed on
+                the 3D mesh defined by rijgrid.
     """
     
-    # Get simulation parameters from the arguments and limit rcut if needed.
+    # Get simulation parameters from the arguments, limit rcut if needed, and
+    # preallocate rijcnt.
 
     lx, ly, lz = box_config[0:3]
     rcut_lim = min(box_config[0:3]) / 2
     if rcut > rcut_lim:
         rcut = rcut_lim
-
-    # Generate the rij gridpoints and preallocate rijavg.
-    
-    x_gpoints = np.linspace(lx / -2, lx / 2, ngpoints[0])
-    y_gpoints = np.linspace(ly / -2, ly / 2, ngpoints[1])
-    z_gpoints = np.linspace(lz / -2, lz / 2, ngpoints[2])
-    rijgrid = meshgrid3D(x_gpoints, y_gpoints, z_gpoints)
-    rijavg = np.zeros(rijgrid[0].shape)
+    x_lo = np.amin(rijgrid[0])
+    y_lo = np.amin(rijgrid[1])
+    z_lo = np.amin(rijgrid[2])
+    ngpoints = rijgrid[0].shape
+    rijcnt = np.zeros(ngpoints)
 
     # Loop through each pair of particles and place the rij vector on the grid.
 
     nparticles = pos.shape[0]
     for i in range(nparticles - 1):
         for j in range(i + 1, nparticles):
-
+            
             # Get the rij vector and apply the minimum image convention.
             
             rij = pos[j] - pos[i]
@@ -640,29 +633,76 @@ def rijavg_from_frame(pos, box_config, rcut, ngpoints):
             rij[1] += int(-2 * rij[1] / ly) * ly
             rij[2] += int(-2 * rij[2] / lz) * lz
 
-            # Place the rij vector (and its additive inverse representing the
-            # reverse order in pairing rji) on the nearest gridpoint.
+            # Check if the length of rij is greater than rcut.
 
-            x_ind = round((rij[0] - x_gpoints[0]) * (ngpoints[0] - 1) / lx)
-            y_ind = round((rij[1] - y_gpoints[0]) * (ngpoints[1] - 1) / ly)
-            z_ind = round((rij[2] - z_gpoints[0]) * (ngpoints[2] - 1) / lz)
-            rijavg[x_ind, y_ind, z_ind] += 1
+            if sqrt(np.dot(rij, rij)) > rcut:
+                continue
 
-            # Place the rji vector (which represents the reverse order in
-            # pairing) on the nearest gridpoint.
+            # Place the rij vector on the nearest gridpoint.
+
+            x_ind = round((rij[0] - x_lo) * (ngpoints[0] - 1) / lx)
+            y_ind = round((rij[1] - y_lo) * (ngpoints[1] - 1) / ly)
+            z_ind = round((rij[2] - z_lo) * (ngpoints[2] - 1) / lz)
+            rijcnt[x_ind, y_ind, z_ind] += 1
+
+            # # Place the rji vector (which represents the reverse order in
+            # # pairing) on the nearest gridpoint.
 
             rji = -1 * rij
-            x_ind = round((rji[0] - x_gpoints[0]) * (ngpoints[0] - 1) / lx)
-            y_ind = round((rji[1] - y_gpoints[0]) * (ngpoints[1] - 1) / ly)
-            z_ind = round((rji[2] - z_gpoints[0]) * (ngpoints[2] - 1) / lz)
-            rijavg[x_ind, y_ind, z_ind] += 1
+            x_ind = round((rji[0] - x_lo) * (ngpoints[0] - 1) / lx)
+            y_ind = round((rji[1] - y_lo) * (ngpoints[1] - 1) / ly)
+            z_ind = round((rji[2] - z_lo) * (ngpoints[2] - 1) / lz)
+            rijcnt[x_ind, y_ind, z_ind] += 1
 
-    # Go from a count of particles to an average of particles.
+    # Return the number of particles at rij.
 
-    rijavg /= nparticles * (nparticles - 1)
+    return rijcnt
 
-    # Return the rij gridpoints and average number of particles at rij.
+ 
+@jit(nopython=True)
+def rijcnt_from_traj(traj, box_config, rijgrid, rcut):
+    """
+    For each frame, count the number of particles separated by a vector rij.
+    rij is equal to the position vector of particle j minus the position vector
+    of particle i.
+    
+    Args:
+        traj: The trajectory of each particle stored as a 3D numpy array with
+              dimensions 'frame (ascending order) by particle ID (ascending 
+              order) by particle position (x, y, z)'.
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+        rijgrid: The gridpoint values of each axis in the 3D mesh, that the rij
+                 vector is placed on, stored as a 4D numpy array with dimension
+                 'axis (x, y, z) by x-index by y-index by z-index'.
+        rcut: The rij vector cutoff used to determine the maximum length the
+              rij vector can be along a single axis. Due to the minimum image 
+              convention, rcut cannot be greater than the shortest simulation 
+              box length.
 
-    return rijgrid, rijavg
+    Returns:
+        traj_rijcnt: The number of particles separated by a vector rij per
+                     frame stored as a 4D numpy array with dimensions 'frame
+                     (ascending order) by x-index by y-index by z-index', where
+                     these indices are the indices of the rij vector placed on 
+                     the 3D mesh defined by rijgrid.
+    """
+    
+    # Get simulation parameters from the arguments and preallocate arrays.
+    
+    nframes = traj.shape[0]
+    traj_rijcnt = np.zeros(nframes, rijgrid[0].shape[0], rijgrid[0].shape[1],
+                           rijgrid[0].shape[2])
 
+    # Loop through each frame and get the number of particles at rij per frame.
+
+    for frame in range(nframes):
+        traj_rijcnt[frame] = rijcnt_from_frame(traj[frame], box_config, 
+                                               rijgrid, rcut)
+
+    # Return the number of particles at rij per frame.
+
+    return traj_rijcnt
 

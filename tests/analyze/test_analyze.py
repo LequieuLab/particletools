@@ -451,17 +451,14 @@ class TestAnalyzeFunctions(unittest.TestCase):
               [[ 0,  1,  2,  3],
                [ 0,  1,  2,  3],
                [ 0,  1,  2,  3]]]
-        grid = [xv, yv, zv]
+        grid = np.stack((xv, yv, zv), axis=0)
 
-        # Test meshgrid3D to see if it returns the correct values. Grids are 
-        # compared as numpy arrays for ease of testing.
+        # Test meshgrid3D to see if it returns the correct values.
 
         test_grid = pt.meshgrid3D(x, y, z)
-        grid = np.asarray(grid)
-        test_grid = np.asarray(test_grid)
         self.assertTrue((test_grid == grid).all())
 
-    def test_rijavg_from_frame(self):
+    def test_rijcnt_from_frame(self):
 
         # Define an orthogonal simulation box configuration.
 
@@ -472,7 +469,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         pos =  [[    3,    -2,     3],
                 [    3,     2,     1],
                 [    2,    -1,     0],
-                [   -3,     2,     0]]
+                [   -3,     2,  0.01]]
         pos = np.asarray(pos)
                 
         # Define the rij vector cutoff and the number of grind points per axis.
@@ -587,55 +584,120 @@ class TestAnalyzeFunctions(unittest.TestCase):
                [ -4,  0,  4],
                [ -4,  0,  4],
                [ -4,  0,  4]]]
-        rijgrid = [xv, yv, zv]
-        rijavg = [[[  0,  0,  0], 
+        rijgrid = np.stack((xv, yv, zv), axis=0)
+        rijcnt = [[[  0,  0,  0], 
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
-                   [  0,  1,  0]], 
+                   [  0,  0,  0]], 
                   [[  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  1,  0],  
                    [  0,  0,  0],  
-                   [  0,  0,  1],  
-                   [  0,  0,  0]], 
-                  [[  0,  1,  0],  
-                   [  1,  0,  0],  
-                   [  0,  0,  1],  
                    [  0,  0,  0],  
-                   [  1,  0,  0],  
-                   [  0,  0,  1],  
-                   [  0,  1,  0]], 
+                   [  0,  0,  0]], 
                   [[  0,  0,  0],  
                    [  1,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  1],  
+                   [  0,  0,  0]], 
+                  [[  0,  0,  0],  
+                   [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  1,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0]], 
-                  [[  0,  1,  0],  
+                  [[  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0],  
                    [  0,  0,  0]]] 
-        rijavg = np.asarray(rijavg, dtype=np.float64)
-        rijavg /= (pos.shape[0] * (pos.shape[0] - 1))
+        rijcnt = np.asarray(rijcnt, dtype=np.float64)
 
         # Test rij_avg_from_frame to see if it returns the correct values. 
-        # Grids are compared as numpy arrays for ease of testing.
 
-        test_rijgrid, test_rijavg = pt.rijavg_from_frame(pos, box_config, rcut, 
-                                                         ngpoints)
-        rijgrid = np.asarray(rijgrid)
-        test_rijgrid = np.asarray(test_rijgrid)
-        self.assertTrue((test_rijgrid == rijgrid).all())
-        self.assertTrue((test_rijavg == rijavg).all())
+        test_rijcnt = pt.rijcnt_from_frame(pos, box_config, rijgrid, rcut)
+        self.assertTrue((test_rijcnt == rijcnt).all())
         
+    def test_rijcnt_from_traj(self):
+
+        # Define an orthogonal simulation box configuration.
+
+        box_config = np.asarray([13, 7, 9, 0, 0, 0])
+
+        # Define the positions of particles.
+
+        traj = [[[  2.5,     0,     1],
+                 [  3.5,     1,     1],
+                 [    7,    -1,     0]],
+                [[  5.5,     1,     3],
+                 [ -6.5,     1,     4],
+                 [    0,     0,     0]]]
+        traj = np.asarray(traj)
+                
+        # Define the rij vector cutoff and the number of grind points per axis.
+
+        rcut = 2
+        ngpoints = np.asarray([4, 2, 5])
+
+        # Define the rij grid and the average number of particles at rij.
+
+        xv =      [[[     -6.5,      -6.5,      -6.5,      -6.5,      -6.5],
+                    [     -6.5,      -6.5,      -6.5,      -6.5,      -6.5]],
+                   [[-6.5+13/3, -6.5+13/3, -6.5+13/3, -6.5+13/3, -6.5+13/3],
+                    [-6.5+13/3, -6.5+13/3, -6.5+13/3, -6.5+13/3, -6.5+13/3]],
+                   [[-6.5+26/3, -6.5+26/3, -6.5+26/3, -6.5+26/3, -6.5+26/3],
+                    [-6.5+26/3, -6.5+26/3, -6.5+26/3, -6.5+26/3, -6.5+26/3]],
+                   [[-6.5+39/3, -6.5+39/3, -6.5+39/3, -6.5+39/3, -6.5+39/3],
+                    [-6.5+39/3, -6.5+39/3, -6.5+39/3, -6.5+39/3, -6.5+39/3]]]
+        yv =      [[[     -3.5,      -3.5,      -3.5,      -3.5,      -3.5],
+                    [      3.5,       3.5,       3.5,       3.5,       3.5]],
+                   [[     -3.5,      -3.5,      -3.5,      -3.5,      -3.5],
+                    [      3.5,       3.5,       3.5,       3.5,       3.5]],
+                   [[     -3.5,      -3.5,      -3.5,      -3.5,      -3.5],
+                    [      3.5,       3.5,       3.5,       3.5,       3.5]],
+                   [[     -3.5,      -3.5,      -3.5,      -3.5,      -3.5],
+                    [      3.5,       3.5,       3.5,       3.5,       3.5]]]
+        zv =      [[[     -4.5,     -2.25,         0,      2.25,       4.5],
+                    [     -4.5,     -2.25,         0,      2.25,       4.5]],
+                   [[     -4.5,     -2.25,         0,      2.25,       4.5],
+                    [     -4.5,     -2.25,         0,      2.25,       4.5]],
+                   [[     -4.5,     -2.25,         0,      2.25,       4.5],
+                    [     -4.5,     -2.25,         0,      2.25,       4.5]],
+                   [[     -4.5,     -2.25,         0,      2.25,       4.5],
+                    [     -4.5,     -2.25,         0,      2.25,       4.5]]]
+        rijgrid = np.stack((xv, yv, zv), axis=0)
+        traj_rijcnt = [[[[       0,        0,        0,        0,        0],
+                         [       0,        0,        0,        0,        0]],
+                        [[       0,        0,        1,        0,        0],
+                         [       0,        0,        0,        0,        0]],
+                        [[       0,        0,        0,        0,        0],
+                         [       0,        0,        1,        0,        0]],
+                        [[       0,        0,        0,        0,        0],
+                         [       0,        0,        0,        0,        0]]],
+                       [[[       0,        0,        0,        0,        0],
+                         [       0,        0,        0,        0,        0]],
+                        [[       0,        0,        1,        0,        0],
+                         [       0,        0,        0,        0,        0]],
+                        [[       0,        0,        1,        0,        0],
+                         [       0,        0,        0,        0,        0]],
+                        [[       0,        0,        0,        0,        0],
+                         [       0,        0,        0,        0,        0]]]]
+        traj_rijcnt = np.asarray(traj_rijcnt, dtype=np.float64)
+
+        # Test rij_avg_from_traj to see if it returns the correct values. 
+
+        test_traj_rijcnt = pt.rijcnt_from_traj(traj, box_config, rijgrid, rcut)
+        self.assertTrue((test_traj_rijcnt == traj_rijcnt).all())
+
 
 if __name__ == '__main__':
     unittest.main()
