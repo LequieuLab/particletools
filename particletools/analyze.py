@@ -128,7 +128,7 @@ def unwrap_traj(traj_wrap, box_config, img_flags):
 @jit(nopython=True)
 def mol_com_from_frame(pos, molid, mass):
     """
-    Calculate the center of mass and mass of each molecule for a single frame 
+    Calculate the center of mass and mass of each molecule for a single frame
     of their trajectory.
     
     Args:
@@ -175,8 +175,7 @@ def mol_com_from_frame(pos, molid, mass):
 @jit(nopython=True)
 def mol_com_from_traj(traj, molid, mass):
     """
-    Calculate the center of mass and mass of each molecule across their 
-    trajectory.
+    Calculate the center of mass and mass of each molecule for every frame.
     
     Args:
         traj: The trajectory of each particle stored as a 3D numpy array with
@@ -188,10 +187,10 @@ def mol_com_from_traj(traj, molid, mass):
               dimension 'particle ID (ascending order)'.
 
     Returns:
-        traj_mol_com: The center of mass of each molecule across their 
-                      trajectory stored as a 2D numpy array with dimensions 
-                      'frame (ascending order) by molecule ID (ascending order)
-                      by molecule center of mass (x, y, z)'.
+        traj_mol_com: The center of mass of each molecule for every frame  
+                      stored as a 2D numpy array with dimensions 'frame 
+                      (ascending order) by molecule ID (ascending order) by 
+                      molecule center of mass (x, y, z)'.
         mol_mass: The mass of each molecule stored as a 1D numpy array with
                   dimension 'molecule ID (asecnding order)'.
     """
@@ -262,8 +261,8 @@ def rg_from_frame(pos, molid, mass, mol_com):
 @jit(nopython=True)
 def rg_from_traj(traj, molid, mass, traj_mol_com):
     """
-    Calculate the radius of gyration of each molecule across their trajectory. 
-    The radius of gyration is the average distance between the particles of a 
+    Calculate the radius of gyration of each molecule for every frame. The 
+    radius of gyration is the average distance between the particles of a 
     molecule and the molecule's center of mass.
     
     Args:
@@ -274,15 +273,15 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
                dimension 'particle ID (ascending order)'.
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
-        traj_mol_com: The center of mass of each molecule across their
-                      trajectory stored as a 3D numpy array with dimensions 
-                      'frame (ascending order) by molecule ID (ascending order)
-                      by molecule center of mass (x, y, z)'.
+        traj_mol_com: The center of mass of each molecule for every frame
+                      stored as a 3D numpy array with dimensions 'frame 
+                      (ascending order) by molecule ID (ascending order) by 
+                      molecule center of mass (x, y, z)'.
 
     Returns:
-        traj_rg: The radius of gyration of each molecule across their 
-                 trajectory stored as a 2D numpy array with dimensions 'frame 
-                 (ascending order) by molecule ID (ascending order)'.
+        traj_rg: The radius of gyration of each molecule for every frame stored
+                 as a 2D numpy array with dimensions 'frame (ascending order) 
+                 by molecule ID (ascending order)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -470,7 +469,7 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_axis,
                       nbins, centering='NONE', ccut=350):
     """
     Calculate the average density profile of the selected particles along a 
-    given axis over their trajectory.
+    given axis for every frame.
     
     Args:
         traj: The trajectory of each particle stored as a 3D numpy array with
@@ -507,28 +506,29 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_axis,
               cluster.
 
     Returns:
-        density_profile: The density profile of the selected particles along a
-                         given axis stored as a 2D numpy array with dimensions
-                         'bin index by bin properties (position along the axis,
-                         density at that position).
+        traj_density_profile: The density profile of the selected particles
+                              along a given axis per frame stored as a 3D numpy
+                              array with dimensions 'frame (ascending order) by
+                              bin index by bin properties (position along the 
+                              axis, density at that position)'.
     """
     # Get the number of simulation frames and preallocate a density profile.
     
     nframes = traj.shape[0]
-    density_profile = np.zeros((nbins, 2))
+    traj_density_profile = np.zeros((nframes, nbins, 2))
 
     # Loop through each frame and sum the density profiles.
 
     for frame in range(nframes):
         pos = traj[frame]
-        density_profile += density_from_frame(pos, molid, mass, box_config,
-                                              selection, bin_axis, nbins,
-                                              centering, ccut)
+        traj_density_profile[frame] = density_from_frame(pos, molid, mass, 
+                                                         box_config, selection, 
+                                                         bin_axis, nbins, 
+                                                         centering, ccut)
 
-    # Return the average density profile over the frames.
+    # Return the density profile per frame.
 
-    density_profile /= nframes
-    return density_profile 
+    return traj_density_profile 
 
 
 @jit(nopython=True)
@@ -580,9 +580,9 @@ def meshgrid3D(x, y, z):
 @jit(nopython=True)
 def rijcnt_from_frame(pos, box_config, rijgrid, rcut):
     """
-    For a single frame, count the number of particles separated by a vector
-    rij. rij is equal to the position vector of particle j minus the position
-    vector of particle i.
+    Count the number of particles separated by a vector rij for a single frame.
+    rij is equal to the position vector of particle j minus the position vector
+    of particle i.
     
     Args:
         pos: The position of each particle stored as a 2D numpy array with
@@ -662,9 +662,9 @@ def rijcnt_from_frame(pos, box_config, rijgrid, rcut):
 @jit(nopython=True)
 def rijcnt_from_traj(traj, box_config, rijgrid, rcut):
     """
-    For each frame, count the number of particles separated by a vector rij.
-    rij is equal to the position vector of particle j minus the position vector
-    of particle i.
+    Count the number of particles separated by a vector rij for each frame. rij
+    is equal to the position vector of particle j minus the position vector of 
+    particle i.
     
     Args:
         traj: The trajectory of each particle stored as a 3D numpy array with
@@ -693,8 +693,8 @@ def rijcnt_from_traj(traj, box_config, rijgrid, rcut):
     # Get simulation parameters from the arguments and preallocate arrays.
     
     nframes = traj.shape[0]
-    traj_rijcnt = np.zeros(nframes, rijgrid[0].shape[0], rijgrid[0].shape[1],
-                           rijgrid[0].shape[2])
+    traj_rijcnt = np.zeros((nframes, rijgrid[0].shape[0], rijgrid[0].shape[1],
+                           rijgrid[0].shape[2]))
 
     # Loop through each frame and get the number of particles at rij per frame.
 

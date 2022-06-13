@@ -361,7 +361,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         selection = np.asarray(selection)
 
         # For the 'NONE' centering method, define the density profile and test
-        # density_from_frame to see if it returns the correct values.
+        # density_from_traj to see if it returns the correct values. 
 
         density_profile = [[ -10,   0], 
                            [  -8,   0], 
@@ -375,14 +375,15 @@ class TestAnalyzeFunctions(unittest.TestCase):
                            [   8, 0.5]] 
         density_profile = np.asarray(density_profile, dtype=np.float64)
         density_profile[:, 1] /= (3 * 50 * 20 / 10)
-        test_density_profile = pt.density_from_traj(traj, molid, mass,
-                                                    box_config, selection,
-                                                    bin_axis, nbins, 'NONE', 
-                                                    ccut)
+        test_traj_density_profile = pt.density_from_traj(traj, molid, mass,
+                                                         box_config, selection,
+                                                         bin_axis, nbins, 
+                                                         'NONE', ccut)
+        test_density_profile = np.average(test_traj_density_profile, axis=0)
         self.assertTrue((test_density_profile == density_profile).all())
 
         # For the 'SYSTEM' centering method, define the density profile and
-        # test density_from_frame to see if it returns the correct values.
+        # test density_from_traj to see if it returns the correct values.
 
         density_profile = [[ -10, 1.5], 
                            [  -8, 0.5], 
@@ -396,14 +397,15 @@ class TestAnalyzeFunctions(unittest.TestCase):
                            [   8, 0.5]] 
         density_profile = np.asarray(density_profile, dtype=np.float64)
         density_profile[:, 1] /= (3 * 50 * 20 / 10)
-        test_density_profile = pt.density_from_traj(traj, molid, mass, 
-                                                     box_config, selection, 
-                                                     bin_axis, nbins, 'SYSTEM', 
-                                                     ccut)
+        test_traj_density_profile = pt.density_from_traj(traj, molid, mass,
+                                                         box_config, selection,
+                                                         bin_axis, nbins, 
+                                                         'SYSTEM', ccut)
+        test_density_profile = np.average(test_traj_density_profile, axis=0)
         self.assertTrue((test_density_profile == density_profile).all())
 
         # For the 'SLAB' centering method, define the density profile and test
-        # density_from_frame to see if it returns the correct values.
+        # density_from_traj to see if it returns the correct values.
 
         density_profile = [[ -10,   0],  
                            [  -8,   0], 
@@ -417,10 +419,11 @@ class TestAnalyzeFunctions(unittest.TestCase):
                            [   8,   0]] 
         density_profile = np.asarray(density_profile, dtype=np.float64)
         density_profile[:, 1] /= (3 * 50 * 20 / 10)
-        test_density_profile = pt.density_from_traj(traj, molid, mass, 
-                                                     box_config, selection, 
-                                                     bin_axis, nbins, 'SLAB', 
-                                                     ccut)
+        test_traj_density_profile = pt.density_from_traj(traj, molid, mass,
+                                                         box_config, selection,
+                                                         bin_axis, nbins, 
+                                                         'SLAB', ccut)
+        test_density_profile = np.average(test_traj_density_profile, axis=0)
         self.assertTrue((test_density_profile == density_profile).all())
 
     def test_meshgrid3D(self):
