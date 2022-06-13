@@ -22,8 +22,8 @@ class TestAnalyzeFunctions(unittest.TestCase):
                      [[  2,  -3, 0.5], [  0,  -1,  -4]]]
         img_flags = [[[  0,   0,   0], [  0,   0,   0]],
                      [[ -1,   1,   0], [  1,  -1,   0]],
-                     [[ -1,   1,   0], [  0,   0,   0]],
-                     [[ -2,   2,   0], [  0,   0,   1]]]
+                     [[  0,   0,   1], [  0,   0,   0]],
+                     [[ -1,   1,   1], [  1,   0,   1]]]
         traj_wrap = np.asarray(traj_wrap)
         img_flags = np.asarray(img_flags, dtype=np.int32)
 
@@ -467,27 +467,20 @@ class TestAnalyzeFunctions(unittest.TestCase):
 
         box_config = np.asarray([8, 6, 8, 0, 0, 0])
 
-        # Define the positions and quaternions of particles.
+        # Define the positions of particles.
 
-        pos =  [[    3,    -2,     1],
+        pos =  [[    3,    -2,     3],
                 [    3,     2,     1],
                 [    2,    -1,     0],
                 [   -3,     2,     0]]
-        quat = [[    0,     0,     0,     0],
-                [    0,     0,     0,     0],
-                [    0,     0,     0,     0],
-                [    0,     0,     0,     0],
-                [    0,     0,     0,     0]]
         pos = np.asarray(pos)
-        quat = np.asarray(quat)
                 
         # Define the rij vector cutoff and the number of grind points per axis.
 
         rcut = 400
         ngpoints = np.asarray([5, 7, 3])
 
-        # Define the rij grid and rij average for the default function
-        # (particle count).
+        # Define the rij grid and the average number of particles at rij.
 
         xv = [[[ -4, -4, -4],
                [ -4, -4, -4],
@@ -595,17 +588,53 @@ class TestAnalyzeFunctions(unittest.TestCase):
                [ -4,  0,  4],
                [ -4,  0,  4]]]
         rijgrid = [xv, yv, zv]
+        rijavg = [[[  0,  0,  0], 
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  1,  0]], 
+                  [[  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  1,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  1],  
+                   [  0,  0,  0]], 
+                  [[  0,  1,  0],  
+                   [  1,  0,  0],  
+                   [  0,  0,  1],  
+                   [  0,  0,  0],  
+                   [  1,  0,  0],  
+                   [  0,  0,  1],  
+                   [  0,  1,  0]], 
+                  [[  0,  0,  0],  
+                   [  1,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  1,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0]], 
+                  [[  0,  1,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0],  
+                   [  0,  0,  0]]] 
+        rijavg = np.asarray(rijavg, dtype=np.float64)
+        rijavg /= (pos.shape[0] * (pos.shape[0] - 1))
 
-        # For the default particle count function, define the rij averaged
-        # values and test rijavg_from_frame to see if it returns the correct
-        # values. Grids are compared as numpy arrays for ease of testing.
+        # Test rij_avg_from_frame to see if it returns the correct values. 
+        # Grids are compared as numpy arrays for ease of testing.
 
         test_rijgrid, test_rijavg = pt.rijavg_from_frame(pos, box_config, rcut, 
                                                          ngpoints)
         rijgrid = np.asarray(rijgrid)
         test_rijgrid = np.asarray(test_rijgrid)
         self.assertTrue((test_rijgrid == rijgrid).all())
-        # self.assertTrue((test_rijavg == rijavg).all())
+        self.assertTrue((test_rijavg == rijavg).all())
         
 
 if __name__ == '__main__':
