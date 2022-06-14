@@ -625,7 +625,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
                    [  0,  0,  0]]] 
         rijcnt = np.asarray(rijcnt, dtype=np.float64)
 
-        # Test rij_avg_from_frame to see if it returns the correct values. 
+        # Test rijcnt_from_frame to see if it returns the correct values. 
 
         test_rijcnt = pt.rijcnt_from_frame(pos, box_config, rijgrid, rcut)
         self.assertTrue((test_rijcnt == rijcnt).all())
@@ -696,7 +696,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
                          [       0,        0,        0,        0,        0]]]]
         traj_rijcnt = np.asarray(traj_rijcnt, dtype=np.float64)
 
-        # Test rij_avg_from_traj to see if it returns the correct values. 
+        # Test rijcnt_from_traj to see if it returns the correct values. 
 
         test_traj_rijcnt = pt.rijcnt_from_traj(traj, box_config, rijgrid, rcut)
         self.assertTrue((test_traj_rijcnt == traj_rijcnt).all())
