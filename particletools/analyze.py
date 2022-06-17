@@ -21,15 +21,19 @@ def img_flags_from_traj(traj_wrap, box_config):
     other calculations. Assumes that the box dimensions are constant in time.
     
     Args:
+
         traj_wrap: The wrapped trajectory of each particle stored as a 3D 
                    numpy array with dimensions 'frame (ascending order) by 
                    particle ID (ascending order) by particle position 
                    (x, y, z)'.
+
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz).
+
     Returns:
+
         img_flags: The image flags of the particles across the trajectory
                    stored as a 3D numpy array with dimensions 'frame (ascending
                    order) by particle ID (ascending order) by particle image 
@@ -77,18 +81,23 @@ def unwrap_traj(traj_wrap, box_config, img_flags):
     the box dimensions are constant in time.
     
     Args:
+
         traj_wrap: The wrapped trajectory of each particle stored as a 3D numpy
                    array with dimensions 'frame (ascending order) by particle 
                    ID (ascending order) by particle position (x, y, z)'.
+
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz)'.
+
         img_flags: The image flags of the particles across the trajectory
                    stored as a 3D numpy array with dimensions 'frame (ascending
                    order) by particle ID (ascending order) by particle image 
                    flag (ix, iy, iz)'.
+
     Returns:
+
         traj_unwrap: The unwrapped trajectory of each particle stored as a 3D 
                      numpy array with dimensions 'frame (ascending order) by 
                      particle ID (ascending order) by particle position 
@@ -132,18 +141,24 @@ def mol_com_from_frame(pos, molid, mass):
     of their trajectory.
     
     Args:
+
         pos: The position of each particle stored as a 2D numpy array with
              dimensions 'particle ID (ascending order) by particle position 
              (x, y, z)'.
+
         molid: The molecule ID of each particle stored as a 1D numpy array with
                dimension 'particle ID (ascending order)'.
+
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
 
+
     Returns:
+
         mol_com: The center of mass of each molecule stored as a 2D numpy array
                  with dimensions 'molecule ID (ascending order) by molecule 
                  center of mass (x, y, z)'.
+
         mol_mass: The mass of each molecule stored as a 1D numpy array with
                   dimension 'molecule ID (asecnding order)'.
     """
@@ -178,19 +193,24 @@ def mol_com_from_traj(traj, molid, mass):
     Calculate the center of mass and mass of each molecule for every frame.
     
     Args:
+
         traj: The trajectory of each particle stored as a 3D numpy array with
               dimensions 'frame (ascending order) by particle ID (ascending 
               order) by particle position (x, y, z)'.
+
         molid: The molecule ID of each particle stored as a 1D numpy array with
                dimension 'particle ID (ascending order)'.
+
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
 
     Returns:
+
         traj_mol_com: The center of mass of each molecule for every frame  
                       stored as a 2D numpy array with dimensions 'frame 
                       (ascending order) by molecule ID (ascending order) by 
                       molecule center of mass (x, y, z)'.
+
         mol_mass: The mass of each molecule stored as a 1D numpy array with
                   dimension 'molecule ID (asecnding order)'.
     """
@@ -220,18 +240,23 @@ def rg_from_frame(pos, molid, mass, mol_com):
     the particles of a molecule and the molecule's center of mass.
     
     Args:
+
         pos: The position of each particle stored as a 2D numpy array with
              dimensions 'particle ID (ascending order) by particle position 
              (x, y, z)'.
+
         molid: The molecule ID of each particle stored as a 1D numpy array with
                dimension 'particle ID (ascending order)'.
+
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
+
         mol_com: The center of mass of each molecule stored as a 2D numpy array
                  with dimensions 'molecule ID (ascending order) by molecule 
                  center of mass (x, y, z)'.
 
     Returns:
+
         rg: The radius of gyration of each molecule stored as a 1D numpy array
             with dimension 'molecule ID (ascending order)'.
     """
@@ -266,19 +291,24 @@ def rg_from_traj(traj, molid, mass, traj_mol_com):
     molecule and the molecule's center of mass.
     
     Args:
+
         traj: The trajectory of each particle stored as a 3D numpy array with
               dimensions 'frame (ascending order) by particle ID (ascending 
               order) by particle position (x, y, z)'.
+
         molid: The molecule ID of each particle stored as a 1D numpy array with
                dimension 'particle ID (ascending order)'.
+
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
+
         traj_mol_com: The center of mass of each molecule for every frame
                       stored as a 3D numpy array with dimensions 'frame 
                       (ascending order) by molecule ID (ascending order) by 
                       molecule center of mass (x, y, z)'.
 
     Returns:
+
         traj_rg: The radius of gyration of each molecule for every frame stored
                  as a 2D numpy array with dimensions 'frame (ascending order) 
                  by molecule ID (ascending order)'.
@@ -309,26 +339,34 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_axis,
     for a single frame.
     
     Args:
+
         pos: The position of each particle stored as a 2D numpy array with
              dimensions 'particle ID (ascending order) by particle position 
              (x, y, z)'.
+
         molid: The molecule ID of each particle stored as a 1D numpy array with
                dimension 'particle ID (ascending order)'.
+
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
+
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz)'.
+
         selection: The selected particles chosen for this calculation stored as
                    a 1D numpy array with dimension 'particle ID' (ascending 
                    order). For example, for density_from_frame, the particles
                    making up the density returned are just the selected 
                    particles.
+
         bin_axis: The axis along which bins are generated for counting 
                   particles. In most cases, the bin_axis can have a value of 0 
                   (x-axis), 1 (y-axis), or 2 (z-axis).
-        nbins: The number of bins to generate for counting particles.
+
+        nbins: The number of bins to generate for counting particles.         
+
         centering: The centering method used when calculating the density
                    profile. Centering can have values of 'NONE' (no centering
                    is performed), 'SYSTEM' (all particle positions are shifted
@@ -336,6 +374,7 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_axis,
                    profile), or 'SLAB' (all particle positions are shifted so
                    that the largest cluster of particles is at the center of
                    the profile).
+
         ccut: The cluster cutoff used for determining clusters in the 'SLAB'
               centering method. For efficiency, molecules are clustered
               together instead of particles, and ccut is the maximum
@@ -343,6 +382,7 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_axis,
               cluster.
 
     Returns:
+
         density_profile: The density profile of the selected particles along a
                          given axis stored as a 2D numpy array with dimensions
                          'bin index by bin properties (position along the axis,
@@ -472,26 +512,34 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_axis,
     given axis for every frame.
     
     Args:
+
         traj: The trajectory of each particle stored as a 3D numpy array with
               dimensions 'frame (ascending order) by particle ID (ascending 
               order) by particle position (x, y, z)'.
+
         molid: The molecule ID of each particle stored as a 1D numpy array with
                dimension 'particle ID (ascending order)'.
+
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
+
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz)'.
+
         selection: The selected particles chosen for this calculation stored as
                    a 1D numpy array with dimension 'particle ID' (ascending 
                    order). For example, for density_from_frame, the particles
                    making up the density returned are just the selected 
                    particles.
+
         bin_axis: The axis along which bins are generated for counting 
                   particles. In most cases, the bin_axis can have a value of 0 
                   (x-axis), 1 (y-axis), or 2 (z-axis).
+
         nbins: The number of bins to generate for counting particles.
+
         centering: The centering method used when calculating the density
                    profile. Centering can have values of 'NONE' (no centering
                    is performed), 'SYSTEM' (all particle positions are shifted
@@ -499,6 +547,7 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_axis,
                    profile), or 'SLAB' (all particle positions are shifted so
                    that the largest cluster of particles is at the center of
                    the profile).
+
         ccut: The cluster cutoff used for determining clusters in the 'SLAB'
               centering method. For efficiency, molecules are clustered
               together instead of particles, and ccut is the maximum
@@ -506,6 +555,7 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_axis,
               cluster.
 
     Returns:
+
         traj_density_profile: The density profile of the selected particles
                               along a given axis per frame stored as a 3D numpy
                               array with dimensions 'frame (ascending order) by
@@ -539,14 +589,18 @@ def meshgrid3D(x, y, z):
     is compatible with Numba's jit compilation in nopython mode.
     
     Args:
+
         x: The x-axis values of the 3D mesh stored as a 1D numpy array with
            dimension 'x-index'.
+
         y: The y-axis values of the 3D mesh stored as a 1D numpy array with
            dimension 'y-index'.
+
         z: The z-axis values of the 3D mesh stored as a 1D numpy array with
            dimension 'z-index'.
 
     Returns:
+
         grid: The gridpoint values of each axis in the 3D mesh stored as a 4D
               numpy array with dimension 'axis (x, y, z) by x-index by y-index 
               by z-index'.
@@ -585,22 +639,27 @@ def rijcnt_from_frame(pos, box_config, rijgrid, rcut):
     of particle i.
     
     Args:
+
         pos: The position of each particle stored as a 2D numpy array with
              dimensions 'particle ID (ascending order) by particle position 
              (x, y, z)'.
+
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz)'.
+
         rijgrid: The gridpoint values of each axis in the 3D mesh, that the rij
                  vector is placed on, stored as a 4D numpy array with dimension
                  'axis (x, y, z) by x-index by y-index by z-index'.
+
         rcut: The rij vector cutoff used to determine the maximum length the
               rij vector can be along a single axis. Due to the minimum image 
               convention, rcut cannot be greater than the shortest simulation 
               box length.
 
     Returns:
+
         rijcnt: The number of particles separated by a vector rij stored as a
                 3D numpy array with dimensions 'x-index by y-index by z-index',
                 where these indices are the indices of the rij vector placed on
@@ -667,22 +726,27 @@ def rijcnt_from_traj(traj, box_config, rijgrid, rcut):
     particle i.
     
     Args:
+
         traj: The trajectory of each particle stored as a 3D numpy array with
               dimensions 'frame (ascending order) by particle ID (ascending 
               order) by particle position (x, y, z)'.
+
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz)'.
+
         rijgrid: The gridpoint values of each axis in the 3D mesh, that the rij
                  vector is placed on, stored as a 4D numpy array with dimension
                  'axis (x, y, z) by x-index by y-index by z-index'.
+
         rcut: The rij vector cutoff used to determine the maximum length the
               rij vector can be along a single axis. Due to the minimum image 
               convention, rcut cannot be greater than the shortest simulation 
               box length.
 
     Returns:
+
         traj_rijcnt: The number of particles separated by a vector rij per
                      frame stored as a 4D numpy array with dimensions 'frame
                      (ascending order) by x-index by y-index by z-index', where
