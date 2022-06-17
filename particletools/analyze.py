@@ -607,6 +607,9 @@ def rijcnt_from_frame(pos, box_config, rijgrid, rcut):
                 the 3D mesh defined by rijgrid.
     """
     
+    # TODO Allow gridpoints to be uneven. Can prolly do this by doing binning
+    # with np.argmin(np.abs(difference between value and available bins).
+
     # Get simulation parameters from the arguments, limit rcut if needed, and
     # preallocate rijcnt.
 
