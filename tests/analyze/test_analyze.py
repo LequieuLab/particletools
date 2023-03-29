@@ -701,6 +701,34 @@ class TestAnalyzeFunctions(unittest.TestCase):
         test_traj_rijcnt = pt.rijcnt_from_traj(traj, box_config, rijgrid, rcut)
         self.assertTrue((test_traj_rijcnt == traj_rijcnt).all())
 
+    def test_calc_msd(self):
+
+        # Define the trajectory.
+
+        traj_unwrap = [[[   0,   -5,   40],  
+                        [   0,    5,    0],  
+                        [   0,    7,    0],  
+                        [   0,    7,    2],  
+                        [   0,    9,    0]],
+
+                       [[   0,   -5,   30],  
+                        [   0,   15,    0],  
+                        [ -10,    7,    0],  
+                        [   0,   15,   -4],  
+                        [   6,    9,    8]]]
+        traj_unwrap = np.asarray(traj_unwrap, dtype=np.float64)
+
+        # Define msd to be returned.
+
+        msd = [0, 100]
+        msd = np.asarray(msd)
+
+        # Test meshgrid3D to see if it returns the correct values.
+
+        test_msd = pt.calc_msd(traj_unwrap)
+        self.assertTrue((test_msd == msd).all())
 
 if __name__ == '__main__':
     unittest.main()
+
+
