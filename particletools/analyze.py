@@ -5,6 +5,8 @@ Functions to analyze a particle based trajectory.
 '''
 
 # TODO Expand functions that use box_config as an argument to use tilt factors.
+# TODO Add functions that take write psfs and trajectories from data.
+# TODO Add demos that use these functions on toy systems.
 
 import numpy as np
 from math import sqrt
@@ -12,7 +14,8 @@ from numba import jit
 
 @jit(nopython=True)
 def img_flags_from_traj(traj_wrap, box_config):
-    """
+    """Estimate image flags from a trajectory.
+
     Calculate the image flags of a wrapped particle-based trajectory. This 
     assumes that the dump frequency is sufficiently high such that particles 
     never travel more than half the length of a box dimension, otherwise image 
@@ -21,23 +24,21 @@ def img_flags_from_traj(traj_wrap, box_config):
     other calculations. Assumes that the box dimensions are constant in time.
     
     Args:
-
         traj_wrap: The wrapped trajectory of each particle stored as a 3D 
                    numpy array with dimensions 'frame (ascending order) by 
                    particle ID (ascending order) by particle position 
                    (x, y, z)'.
-
         box_config: The simulation box configuration stored as a 1D numpy array
                     of length 6 with the first three elements being box length
                     (lx, ly, lz) and the last three being tilt factors 
                     (xy, xz, yz).
 
     Returns:
-
-        img_flags: The image flags of the particles across the trajectory
+        img_flags: The image flags of the particles across the trajectory 
                    stored as a 3D numpy array with dimensions 'frame (ascending
                    order) by particle ID (ascending order) by particle image 
                    flag (ix, iy, iz)'.
+
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -769,4 +770,53 @@ def rijcnt_from_traj(traj, box_config, rijgrid, rcut):
     # Return the number of particles at rij per frame.
 
     return traj_rijcnt
+
+@jit(nopython=True)
+def calc_msd(traj_unwrap):
+    """
+    Count the number of particles separated by a vector rij for each frame. rij
+    is equal to the position vector of particle j minus the position vector of 
+    particle i.
+    
+    Args:
+
+        traj_unwrap: The unwrapped trajectory of each particle stored as a 3D 
+                     numpy array with dimensions 'frame (ascending order) by 
+                     particle ID (ascending order) by particle position 
+                     (x, y, z)'.
+
+    Returns:
+
+        msd: The mean-squared displacement of an unwrapped trajectory stored as
+             a 1D numpy array with dimension frame (ascending order).
+    """
+    
+    # Get the number of frames and particles.
+
+    nframes = traj_unwrap.shape[0]
+    nparticles = traj_unwrap.shape[1]
+    
+    # Preallocate sd.
+
+    sd = np.zeros((nframes, nparticles))
+
+    # Loop through each particle.
+
+    for particle in range(nparticles):
+
+        # Loop through each frame.
+
+        initpos = traj_unwrap[0, particle]
+        for frame in range(1, nframes):
+            
+            # Calculate the squared displacement.
+
+            pos = traj_unwrap[frame, particle]
+            delr = pos - initpos
+            sd[frame, particle] = np.dot(delr, delr)
+
+    # Return the mean-squared displacement.
+
+    return np.sum(sd, axis=1) / sd.shape[1]
+
 
