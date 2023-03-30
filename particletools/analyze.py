@@ -6,12 +6,15 @@ Functions to analyze a particle based trajectory.
 
 # TODO Expand functions that use box_config as an argument to use tilt factors.
 # TODO Add functions that take write psfs and trajectories from data.
-# TODO Merge functions that have from traj and from pos to always use traj.
+# TODO Merge functions that have from traj and from pos to be only one of them.
 # TODO Rewrite and recope functions to minimize arguments.
+# TODO Reformat in general and get sphinx documents working.
 # TODO Add demos that use these functions on toy systems.
 
 import numpy as np
 from math import sqrt
+from math import floor
+from math import pi
 from numba import jit
 
 @jit(nopython=True)
@@ -772,4 +775,126 @@ def calc_msd(traj_unwrap):
 
     return np.sum(sd, axis=1) / sd.shape[1]
 
+@jit(nopython=True)
+def calc_rdf(pos, box_config, r_arr):
+    """
+    Calculate the radial distribution function for a frame of a simulation.
+    
+    Args:
+
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+
+        r_arr: A 1D numpy array of radius values to use in calculating the rdf.
+
+    Returns:
+
+        rdf: The radial distribution function for a frame of a simulation
+             stored as a 1D numpy array with dimension radius (matches r_arr).
+    """
+
+    # Get the number of particles and box dimensions.
+
+    nparticles = pos.shape[0]
+    lx, ly, lz = box_config[0:3]
+    
+    # Preallocate rdf and calculate dr.
+
+    nbins = r_arr.size
+    rdf = np.zeros(nbins)
+    dr = r_arr[1] - r_arr[0]
+
+    # Loop through each pair of particles.
+
+    for i in range(nparticles - 1):
+        for j in range(i + 1, nparticles):
+
+            # Get the rij vector and apply the minimum image convention.
+
+            rij = pos[j] - pos[i]
+            rij[0] += int(-2 * rij[0] / lx) * lx
+            rij[1] += int(-2 * rij[1] / ly) * ly
+            rij[2] += int(-2 * rij[2] / lz) * lz
+
+            # Calculate the distance between the pair.
+
+            distance = np.linalg.norm(rij)
+
+            # Store the pair in rdf.
+            
+            idx = floor(distance / dr)
+            if idx >= nbins:
+                continue
+            rdf[idx] += 2
+
+    # Normalize rdf.
+
+    box_vol = lx * lx * lx
+    rho0 = nparticles / box_vol
+    x = r_arr + dr
+    ideal = 4 / 3 * np.pi * rho0 * (x * x * x - r_arr * r_arr * r_arr)
+    rdf /= ideal
+    rdf /= nparticles
+
+    # Return rdf.
+
+    return rdf
+
+
+@jit(nopython=True)
+def calc_S(q_arr, r_arr, rdf, rho0):
+    """
+    Calculate the structure factor from the radial distribution function. See
+    page 73 of Allen and Tildesley (2nd edition) for more.
+    
+    Args:
+
+        q_arr: A 1D numpy array of scattering length values to use in
+               calculating the structure factor.
+
+        r_arr: A 1D numpy array of radius values used in calculating the rdf.
+
+        rdf: The radial distribution function for a frame of a simulation
+             stored as a 1D numpy array with dimension radius (matches r_arr).
+
+        rho0: The bulk density for the particles used in calculating the rdf
+              stored as a float.
+
+    Returns:
+
+        S: The structure factor stored as a 1D numpy array with dimension 
+           scattering length (matches q_arr).
+    """
+
+    # Preallocate memory for the structure factor.
+    
+    S = np.zeros(q_arr.size)
+
+    # Perform the Fourier transform of the radial distribution function.
+
+    for i, q in enumerate(q_arr):
+        integrand = r_arr * (rdf - 1) * np.sin(q * r_arr)
+        
+        # Evaluate the integrand with the composite Simpson's 3/8 rule.
+
+        a = r_arr[0]
+        b = r_arr[-1]
+        n = r_arr.size - 1
+        h = (b - a) / n
+        integral = 0
+        for j in range(1, int(n / 3) + 1):
+            integral += integrand[3 * j - 3] + 3 * integrand[3 * j - 2] +\
+                        3 * integrand[3 * j - 1] + integrand[3 * j]
+        integral *= 3 / 8 * h
+        S[i] = 1 + 4 * pi * rho0 / q * integral
+
+    # Return the structure factor.
+
+    return S
 

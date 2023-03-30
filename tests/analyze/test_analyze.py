@@ -6,6 +6,8 @@ import numpy as np
 from math import sqrt
 from numpy.random import default_rng
 
+# TODO Add unit tests for calc_rdf and calc_S. 
+
 class TestAnalyzeFunctions(unittest.TestCase):
 
     def test_img_flags_from_traj(self):
@@ -27,7 +29,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         traj_wrap = np.asarray(traj_wrap)
         img_flags = np.asarray(img_flags, dtype=np.int32)
 
-        # Test get_img_flags to see if it returns the correct values.
+        # Test get_img_flags to see if it returns the expected values.
 
         test_img_flags = pt.img_flags_from_traj(traj_wrap, box_config)
         self.assertTrue((test_img_flags == img_flags).all())
@@ -57,7 +59,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         img_flags = np.asarray(img_flags, dtype=np.int32)
         traj_unwrap = np.asarray(traj_unwrap)
 
-        # Test unwrap_traj to see if it returns the correct values.
+        # Test unwrap_traj to see if it returns the expected values.
 
         test_traj_unwrap = pt.unwrap_traj(traj_wrap, box_config, img_flags)
         self.assertTrue((test_traj_unwrap == traj_unwrap).all())
@@ -89,7 +91,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         mol_com = np.asarray(mol_com)
         mol_mass = np.asarray(mol_mass)
 
-        # Test mol_com_from_frame to see if it returns the correct values.
+        # Test mol_com_from_frame to see if it returns the expected values.
 
         test_mol_com, test_mol_mass = pt.mol_com_from_frame(pos, molid, mass)
         self.assertTrue((test_mol_com == mol_com).all())
@@ -139,7 +141,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         traj_mol_com = np.asarray(traj_mol_com)
         mol_mass = np.asarray(mol_mass)
 
-        # Test mol_com_from_traj to see if it returns the correct values.
+        # Test mol_com_from_traj to see if it returns the expected values.
 
         test_traj_mol_com, test_mol_mass = pt.mol_com_from_traj(traj, molid, 
                                                                 mass)
@@ -201,7 +203,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         selection = np.asarray(selection)
 
         # For the 'NONE' centering method, define the density profile and test
-        # density_from_frame to see if it returns the correct values.
+        # density_from_frame to see if it returns the expected values.
 
         density_profile = [[  -5,   0], 
                            [  -4,   1], 
@@ -222,7 +224,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         self.assertTrue((test_density_profile == density_profile).all())
 
         # For the 'SYSTEM' centering method, define the density profile and
-        # test density_from_frame to see if it returns the correct values.
+        # test density_from_frame to see if it returns the expected values.
 
         density_profile = [[  -5,   0], 
                            [  -4,   2], 
@@ -243,7 +245,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         self.assertTrue((test_density_profile == density_profile).all())
 
         # For the 'SLAB' centering method, define the density profile and test
-        # density_from_frame to see if it returns the correct values.
+        # density_from_frame to see if it returns the expected values.
 
         density_profile = [[  -5,   2], 
                            [  -4,   0], 
@@ -298,7 +300,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         selection = np.asarray(selection)
 
         # For the 'NONE' centering method, define the density profile and test
-        # density_from_traj to see if it returns the correct values. 
+        # density_from_traj to see if it returns the expected values. 
 
         density_profile = [[ -10,   0], 
                            [  -8,   0], 
@@ -320,7 +322,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         self.assertTrue((test_density_profile == density_profile).all())
 
         # For the 'SYSTEM' centering method, define the density profile and
-        # test density_from_traj to see if it returns the correct values.
+        # test density_from_traj to see if it returns the expected values.
 
         density_profile = [[ -10, 1.5], 
                            [  -8, 0.5], 
@@ -342,7 +344,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
         self.assertTrue((test_density_profile == density_profile).all())
 
         # For the 'SLAB' centering method, define the density profile and test
-        # density_from_traj to see if it returns the correct values.
+        # density_from_traj to see if it returns the expected values.
 
         density_profile = [[ -10,   0],  
                            [  -8,   0], 
@@ -393,7 +395,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
                [ 0,  1,  2,  3]]]
         grid = np.stack((xv, yv, zv), axis=0)
 
-        # Test meshgrid3D to see if it returns the correct values.
+        # Test meshgrid3D to see if it returns the expected values.
 
         test_grid = pt.meshgrid3D(x, y, z)
         self.assertTrue((test_grid == grid).all())
@@ -562,7 +564,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
                    [  0,  0,  0]]] 
         rijcnt = np.asarray(rijcnt, dtype=np.float64)
 
-        # Test rijcnt_from_frame to see if it returns the correct values. 
+        # Test rijcnt_from_frame to see if it returns the expected values. 
 
         test_rijcnt = pt.rijcnt_from_frame(pos, box_config, rijgrid, rcut)
         self.assertTrue((test_rijcnt == rijcnt).all())
@@ -633,7 +635,7 @@ class TestAnalyzeFunctions(unittest.TestCase):
                          [       0,        0,        0,        0,        0]]]]
         traj_rijcnt = np.asarray(traj_rijcnt, dtype=np.float64)
 
-        # Test rijcnt_from_traj to see if it returns the correct values. 
+        # Test rijcnt_from_traj to see if it returns the expected values. 
 
         test_traj_rijcnt = pt.rijcnt_from_traj(traj, box_config, rijgrid, rcut)
         self.assertTrue((test_traj_rijcnt == traj_rijcnt).all())
@@ -660,10 +662,11 @@ class TestAnalyzeFunctions(unittest.TestCase):
         msd = [0, 100]
         msd = np.asarray(msd)
 
-        # Test meshgrid3D to see if it returns the correct values.
+        # Test msd to see if it returns the expected values.
 
         test_msd = pt.calc_msd(traj_unwrap)
         self.assertTrue((test_msd == msd).all())
+
 
 if __name__ == '__main__':
     unittest.main()
