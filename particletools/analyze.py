@@ -6,6 +6,8 @@ Functions to analyze a particle based trajectory.
 
 # TODO Expand functions that use box_config as an argument to use tilt factors.
 # TODO Add functions that take write psfs and trajectories from data.
+# TODO Merge functions that have from traj and from pos to always use traj.
+# TODO Rewrite and recope functions to minimize arguments.
 # TODO Add demos that use these functions on toy systems.
 
 import numpy as np
@@ -234,11 +236,11 @@ def mol_com_from_traj(traj, molid, mass):
 
 
 @jit(nopython=True)
-def rg_from_frame(pos, molid, mass, mol_com):
+def calc_rg(pos, mass):
     """
-    Calculate the radius of gyration of each molecule for a single frame of
-    their trajectory. The radius of gyration is the average distance between
-    the particles of a molecule and the molecule's center of mass.
+    Calculate the radius of gyration for a molecule. The radius of gyration is 
+    the mass-averaged distance between the particles of a molecule and the 
+    molecule's center of mass.
     
     Args:
 
@@ -246,90 +248,38 @@ def rg_from_frame(pos, molid, mass, mol_com):
              dimensions 'particle ID (ascending order) by particle position 
              (x, y, z)'.
 
-        molid: The molecule ID of each particle stored as a 1D numpy array with
-               dimension 'particle ID (ascending order)'.
-
         mass: The mass of each particle stored as a 1D numpy array with
               dimension 'particle ID (ascending order)'.
 
-        mol_com: The center of mass of each molecule stored as a 2D numpy array
-                 with dimensions 'molecule ID (ascending order) by molecule 
-                 center of mass (x, y, z)'.
-
     Returns:
 
-        rg: The radius of gyration of each molecule stored as a 1D numpy array
-            with dimension 'molecule ID (ascending order)'.
+        rg: The radius of gyration of the molecule stored as a float.
     """
+    
+    # Find the number of particles.
 
-    # Get simulation parameters from the arguments and preallocate arrays.
+    nparticles = pos.shape[0]
 
-    mols = np.unique(molid)
-    rg = np.zeros(mols.shape[0])
+    # Find the total mass of the molecule.
 
-    # Loop through each molecule, find the corresponding particle indices, and
-    # then calculate the radius of gyration of the molecule.
+    m_total = np.sum(mass)
 
-    for mol in mols:
-        indices = np.where(molid == mol)[0]
-        mol_idx = np.where(mols == mol)
-        dr = (pos[indices] - mol_com[mol_idx]).flatten()
-        sq_dist = np.dot(dr, dr)
-        N = indices.shape[0]
-        sq_rg = sq_dist / N
-        rg[mol_idx] = sqrt(sq_rg)
-        
-    # Return the molecules' radii of gyration.
+    # Calculate the center of mass for the molecule.
 
+    com = np.sum(pos * mass.reshape(nparticles, 1), axis=0) / m_total
+
+    # Calculate the distance between each particle and the molecule's com.
+
+    s = pos - com
+    s2 = np.sum(s * s, axis=1)
+
+    # Calculate Rg.
+
+    rg = sqrt(np.sum(s2 * mass, axis=0) / m_total)
+
+    # Return Rg.
+    
     return rg
-
-
-@jit(nopython=True)
-def rg_from_traj(traj, molid, mass, traj_mol_com):
-    """
-    Calculate the radius of gyration of each molecule for every frame. The 
-    radius of gyration is the average distance between the particles of a 
-    molecule and the molecule's center of mass.
-    
-    Args:
-
-        traj: The trajectory of each particle stored as a 3D numpy array with
-              dimensions 'frame (ascending order) by particle ID (ascending 
-              order) by particle position (x, y, z)'.
-
-        molid: The molecule ID of each particle stored as a 1D numpy array with
-               dimension 'particle ID (ascending order)'.
-
-        mass: The mass of each particle stored as a 1D numpy array with
-              dimension 'particle ID (ascending order)'.
-
-        traj_mol_com: The center of mass of each molecule for every frame
-                      stored as a 3D numpy array with dimensions 'frame 
-                      (ascending order) by molecule ID (ascending order) by 
-                      molecule center of mass (x, y, z)'.
-
-    Returns:
-
-        traj_rg: The radius of gyration of each molecule for every frame stored
-                 as a 2D numpy array with dimensions 'frame (ascending order) 
-                 by molecule ID (ascending order)'.
-    """
-
-    # Get simulation parameters from the arguments and preallocate arrays.
-    
-    nframes = traj.shape[0]
-    nmols = np.unique(molid).shape[0]
-    traj_rg = np.zeros((nframes, nmols))
-
-    # Loop through each frame and get the radius of gyration of each molecule.
-
-    for frame in range(nframes):
-        traj_rg[frame] = rg_from_frame(traj[frame], molid, mass, 
-                                       traj_mol_com[frame])
-
-    # Return the molecules' radii of gyration over the trajectory.
-
-    return traj_rg
 
 
 @jit(nopython=True)
