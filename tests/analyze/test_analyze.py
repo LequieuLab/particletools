@@ -146,85 +146,22 @@ class TestAnalyzeFunctions(unittest.TestCase):
         self.assertTrue((test_traj_mol_com == traj_mol_com).all())
         self.assertTrue((test_mol_mass == mol_mass).all())
 
-    def test_rg_from_frame(self):
-        
-        # Define the positions, molecule IDs, and masses of the particles.
+    def test_calc_rg(self):
 
-        pos =     [[ 4.2,  4.2,  3.2],
-                   [   0,    0,    0],
-                   [   8,    4,    1],
-                   [  -1,    0,    1],
-                   [ -11,    0,    6],
-                   [   9,    0,   -4]]
-        molid =    [   1,    0,    0,    2,    2,    2]
-        mass =     [  75,    1,    1,   10,    1,    1]
+        # Define the positions and masses of the molecule's particles.
+
+        pos =     [[  -5,    1,    3],  
+                   [   0,    1,    2],  
+                   [   5,    0,   -9]]  
         pos = np.asarray(pos)
-        molid = np.asarray(molid)
+        mass = [1, 7, 2]
         mass = np.asarray(mass)
 
-        # Define the center of mass and radius of gyration for each molecule.
+        # Test calc_rg to see if it returns the expected value.
 
-        mol_com = [[   4,    2,  0.5],
-                   [ 4.2,  4.2,  3.2],
-                   [  -1,    0,    1]]
-        rg      =  [4.5, 0, sqrt(250/3)]
-        mol_com = np.asarray(mol_com)
-        rg = np.asarray(rg)
-
-        # Test mol_com_from_traj to see if it returns the correct values.
-
-        test_rg = pt.rg_from_frame(pos, molid, mass, mol_com)
-        self.assertTrue((test_rg == rg).all())
-
-    def test_rg_from_traj(self):
-        
-        # Define the trajectory, molecule IDs, and masses of the particles.
-
-        traj =    [[[   5,    5,  3.2],
-                    [   0,    0,    0],
-                    [  10,   -4,    6],
-                    [  -5,    0,    6],
-                    [   0,    0,    6],
-                    [   5,    0,    6]],
-                   [[ 4.5,  4.5,    7],
-                    [   6,   -2,    0],
-                    [  10,   -4,   10],
-                    [   0,   -5,    8],
-                    [   0,    0,    8],
-                    [   0,    5,    8]],
-                   [[   8,    9,    1],
-                    [  -1,   -1,   -1],
-                    [   1,    1,    1],
-                    [  -2,    0,    8],
-                    [   0,    1,    8],
-                    [   2,    2,    8]]]
-        molid =     [   1,    0,    0,    4,    4,    4]
-        mass =      [  75,    7,    7,    5,   50,    5]
-        traj = np.asarray(traj)
-        molid = np.asarray(molid)
-        mass = np.asarray(mass)
-
-        # Define the center of mass and radius of gyration for each molecule.
-
-        traj_mol_com = [[[   5,   -2,    3],
-                         [   5,    5,  3.2],
-                         [   0,    0,    6]],
-                        [[   8,   -3,    5],
-                         [ 4.5,  4.5,    7],
-                         [   0,    0,    8]],
-                        [[   0,    0,    0],
-                         [   8,    9,    1],
-                         [   0,    1,    8]]]
-        traj_rg = [[sqrt(38), 0, sqrt(50/3)],
-                   [sqrt(30), 0, sqrt(50/3)],
-                   [ sqrt(3), 0, sqrt(10/3)]]
-        traj_mol_com = np.asarray(traj_mol_com)
-        traj_rg = np.asarray(traj_rg)
-
-        # Test mol_com_from_traj to see if it returns the correct values.
-
-        test_traj_rg = pt.rg_from_traj(traj, molid, mass, traj_mol_com) 
-        self.assertTrue((test_traj_rg == traj_rg).all())
+        test_calc_rg = pt.calc_rg(pos, mass)
+        calc_rg = sqrt(27.3)
+        self.assertTrue((test_calc_rg == calc_rg))
 
     def test_density_from_frame(self):
 
