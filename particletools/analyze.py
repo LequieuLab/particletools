@@ -898,3 +898,62 @@ def calc_S(q_arr, r_arr, rdf, rho0):
 
     return S
 
+
+@jit(nopython=True)
+def calc_rgt(pos, mass):
+    """
+    Calculate the radius of gyration tensor for a molecule. The radius of 
+    gyration tensor is a 3 by 3 matrix that describes the shape of a molecule.
+    Each element is effectively a squared radius of gyration calculation in 1
+    dimension or a convolution of 2 dimensions. When diagonlized, the radius of
+    gyration tensor returns the squared radius of gyration through a sum of the
+    squared diagonal elements.
+    
+    Args:
+
+        pos: The position of each particle stored as a 2D numpy array with
+             dimensions 'particle ID (ascending order) by particle position 
+             (x, y, z)'.
+
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+
+    Returns:
+
+        rgt: The radius of gyration tensor of a molecule stored as a 2D numpy
+             array with dimensions 1st axis (x, y, z) by 2nd axis (x, y, z).
+    """
+
+    # Preallocate the rg tensor.
+
+    rgt = np.zeros((3, 3))
+    
+    # Find the number of particles.
+
+    nparticles = pos.shape[0]
+
+    # Find the total mass of the molecule.
+
+    m_total = np.sum(mass)
+
+    # Calculate the center of mass for the molecule in x, y, and z.
+
+    x_com = np.sum(pos[:, 0] * mass) / m_total
+    y_com = np.sum(pos[:, 1] * mass) / m_total
+    z_com = np.sum(pos[:, 2] * mass) / m_total
+
+    # Calculate each element of the Rg tensor.
+
+    xx = np.sum(mass * (pos[:, 0] - x_com) ** 2) / m_total
+    xy = np.sum(mass * (pos[:, 0] - x_com) * (pos[:, 1] - y_com)) / m_total
+    xz = np.sum(mass * (pos[:, 0] - x_com) * (pos[:, 2] - z_com)) / m_total
+    yy = np.sum(mass * (pos[:, 1] - y_com) ** 2) / m_total
+    yz = np.sum(mass * (pos[:, 1] - y_com) * (pos[:, 2] - z_com)) / m_total
+    zz = np.sum(mass * (pos[:, 2] - z_com) ** 2) / m_total
+    rgt = np.asarray([[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]])
+
+    # Return the Rg tensor.
+    
+    return rgt
+
+

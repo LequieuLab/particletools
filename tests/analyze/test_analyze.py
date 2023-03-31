@@ -667,6 +667,25 @@ class TestAnalyzeFunctions(unittest.TestCase):
         test_msd = pt.calc_msd(traj_unwrap)
         self.assertTrue((test_msd == msd).all())
 
+    def test_calc_rgt(self):
+
+        # Define the positions and masses of the molecule's particles.
+
+        pos =     [[  -5,    1,    3],  
+                   [   0,    1,    2],  
+                   [   5,    0,   -9]]  
+        pos = np.asarray(pos)
+        mass = [1, 7, 2]
+        mass = np.asarray(mass)
+
+        # Test calc_rg to see if it returns the expected value.
+
+        test_calc_rgt = pt.calc_rgt(pos, mass).round(6)
+        calc_rgt = np.asarray([[ 7.25,  -0.9, -10.45],
+                               [ -0.9,  0.16,   1.78],
+                               [-10.45, 1.78,  19.89]])
+        self.assertTrue((test_calc_rgt == calc_rgt).all())
+
 
 if __name__ == '__main__':
     unittest.main()
