@@ -907,7 +907,7 @@ def calc_rgt(pos, mass):
     Each element is effectively a squared radius of gyration calculation in 1
     dimension or a convolution of 2 dimensions. When diagonlized, the radius of
     gyration tensor returns the squared radius of gyration through a sum of the
-    squared diagonal elements.
+    diagonal elements.
     
     Args:
 
