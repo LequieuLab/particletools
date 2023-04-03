@@ -39,10 +39,10 @@ def img_flags_from_traj(traj_wrap, box_config):
                     (xy, xz, yz).
 
     Returns:
-        img_flags: The image flags of the particles across the trajectory 
-                   stored as a 3D numpy array with dimensions 'frame (ascending
-                   order) by particle ID (ascending order) by particle image 
-                   flag (ix, iy, iz)'.
+        The image flags of the particles across the trajectory 
+        stored as a 3D numpy array with dimensions 'frame (ascending
+        order) by particle ID (ascending order) by particle image 
+        flag (ix, iy, iz)'.
 
     """
 
@@ -104,10 +104,10 @@ def unwrap_traj(traj_wrap, box_config, img_flags):
 
     Returns:
 
-        traj_unwrap: The unwrapped trajectory of each particle stored as a 3D 
-                     numpy array with dimensions 'frame (ascending order) by 
-                     particle ID (ascending order) by particle position 
-                     (x, y, z)'.
+        The unwrapped trajectory of each particle stored as a 3D 
+        numpy array with dimensions 'frame (ascending order) by 
+        particle ID (ascending order) by particle position 
+        (x, y, z)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -161,12 +161,11 @@ def mol_com_from_frame(pos, molid, mass):
 
     Returns:
 
-        mol_com: The center of mass of each molecule stored as a 2D numpy array
-                 with dimensions 'molecule ID (ascending order) by molecule 
-                 center of mass (x, y, z)'.
-
-        mol_mass: The mass of each molecule stored as a 1D numpy array with
-                  dimension 'molecule ID (asecnding order)'.
+        A tuple where the first element is the center of mass of each molecule
+        stored as a 2D numpy array with dimensions 'molecule ID (ascending 
+        order) by molecule center of mass (x, y, z)'. The second element is the
+        mass of each molecule stored as a 1D numpy array with dimension 
+        'molecule ID (asecnding order)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -212,13 +211,12 @@ def mol_com_from_traj(traj, molid, mass):
 
     Returns:
 
-        traj_mol_com: The center of mass of each molecule for every frame  
-                      stored as a 2D numpy array with dimensions 'frame 
-                      (ascending order) by molecule ID (ascending order) by 
-                      molecule center of mass (x, y, z)'.
-
-        mol_mass: The mass of each molecule stored as a 1D numpy array with
-                  dimension 'molecule ID (asecnding order)'.
+        A tuple where the first element is the center of mass of each molecule 
+        for every frame stored as a 2D numpy array with dimensions 'frame 
+        (ascending order) by molecule ID (ascending order) by molecule center 
+        of mass (x, y, z)'. The second element is the mass of each molecule 
+        stored as a 1D numpy array with dimension 'molecule ID (asecnding 
+        order)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -256,7 +254,7 @@ def calc_rg(pos, mass):
 
     Returns:
 
-        rg: The radius of gyration of the molecule stored as a float.
+        The radius of gyration of the molecule stored as a float.
     """
     
     # Find the number of particles.
@@ -325,10 +323,9 @@ def center_traj(traj, molid, mass, box_config, axis, method='SYSTEM',
 
     Returns:
 
-        traj_centered: The centered trajectory of each particle stored as a 3D 
-                       numpy array with dimensions 'frame (ascending order) by 
-                       particle ID (ascending order) by particle position (x, 
-                       y, z)'.
+        The centered trajectory of each particle stored as a 3D numpy array 
+        with dimensions 'frame (ascending order) by particle ID (ascending
+        order) by particle position (x, y, z)'.
     """
 
     # Preallocate memory for traj_centered and the offset to apply.
@@ -472,10 +469,9 @@ def density_from_frame(pos, molid, mass, box_config, selection, bin_axis,
 
     Returns:
 
-        density_profile: The density profile of the selected particles along a
-                         given axis stored as a 2D numpy array with dimensions
-                         'bin index by bin properties (position along the axis,
-                         density at that position).
+        The density profile of the selected particles along a given axis stored
+        as a 2D numpy array with dimensions 'bin index by bin properties 
+        (position along the axis, density at that position).
     """
 
     # Calculate the cross section along the bin dimension.
@@ -645,11 +641,10 @@ def density_from_traj(traj, molid, mass, box_config, selection, bin_axis,
 
     Returns:
 
-        traj_density_profile: The density profile of the selected particles
-                              along a given axis per frame stored as a 3D numpy
-                              array with dimensions 'frame (ascending order) by
-                              bin index by bin properties (position along the 
-                              axis, density at that position)'.
+        The density profile of the selected particles along a given axis per 
+        frame stored as a 3D numpy array with dimensions 'frame (ascending 
+        order) by bin index by bin properties (position along the axis, density
+        at that position)'.
     """
     # Get the number of simulation frames and preallocate a density profile.
     
@@ -690,9 +685,8 @@ def meshgrid3D(x, y, z):
 
     Returns:
 
-        grid: The gridpoint values of each axis in the 3D mesh stored as a 4D
-              numpy array with dimension 'axis (x, y, z) by x-index by y-index 
-              by z-index'.
+        The gridpoint values of each axis in the 3D mesh stored as a 4D numpy
+        array with dimension 'axis (x, y, z) by x-index by y-index by z-index'.
     """
     
     # TODO Replace this with an n-dimensional version.
@@ -749,10 +743,10 @@ def rijcnt_from_frame(pos, box_config, rijgrid, rcut):
 
     Returns:
 
-        rijcnt: The number of particles separated by a vector rij stored as a
-                3D numpy array with dimensions 'x-index by y-index by z-index',
-                where these indices are the indices of the rij vector placed on
-                the 3D mesh defined by rijgrid.
+        The number of particles separated by a vector rij stored as a 3D numpy
+        array with dimensions 'x-index by y-index by z-index', where these 
+        indices are the indices of the rij vector placed on the 3D mesh defined
+        by rijgrid.
     """
     
     # TODO Allow gridpoints to be uneven. Can prolly do this by doing binning
@@ -839,11 +833,10 @@ def rijcnt_from_traj(traj, box_config, rijgrid, rcut):
 
     Returns:
 
-        traj_rijcnt: The number of particles separated by a vector rij per
-                     frame stored as a 4D numpy array with dimensions 'frame
-                     (ascending order) by x-index by y-index by z-index', where
-                     these indices are the indices of the rij vector placed on 
-                     the 3D mesh defined by rijgrid.
+        The number of particles separated by a vector rij per frame stored as a
+        4D numpy array with dimensions 'frame (ascending order) by x-index by 
+        y-index by z-index', where these indices are the indices of the rij 
+        vector placed on the 3D mesh defined by rijgrid.
     """
     
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -878,8 +871,8 @@ def calc_msd(traj_unwrap):
 
     Returns:
 
-        msd: The mean-squared displacement of an unwrapped trajectory stored as
-             a 1D numpy array with dimension frame (ascending order).
+        The mean-squared displacement of an unwrapped trajectory stored as a 1D
+        numpy array with dimension frame (ascending order).
     """
     
     # Get the number of frames and particles.
@@ -930,8 +923,8 @@ def calc_rdf(pos, box_config, r_arr):
 
     Returns:
 
-        rdf: The radial distribution function for a frame of a simulation
-             stored as a 1D numpy array with dimension radius (matches r_arr).
+        The radial distribution function for a frame of a simulation stored as
+        a 1D numpy array with dimension radius (matches r_arr).
     """
 
     # Get the number of particles and box dimensions.
@@ -1003,8 +996,8 @@ def calc_S(q_arr, r_arr, rdf, rho0):
 
     Returns:
 
-        S: The structure factor stored as a 1D numpy array with dimension 
-           scattering length (matches q_arr).
+        The structure factor stored as a 1D numpy array with dimension 
+        scattering length (matches q_arr).
     """
 
     # Preallocate memory for the structure factor.
@@ -1055,8 +1048,8 @@ def calc_rgt(pos, mass):
 
     Returns:
 
-        rgt: The radius of gyration tensor of a molecule stored as a 2D numpy
-             array with dimensions 1st axis (x, y, z) by 2nd axis (x, y, z).
+        The radius of gyration tensor of a molecule stored as a 2D numpy array
+        with dimensions 1st axis (x, y, z) by 2nd axis (x, y, z).
     """
 
     # Preallocate the rg tensor.

@@ -86,6 +86,162 @@
 <span id="particletools-analyze-module"></span><h2>particletools.analyze module<a class="headerlink" href="#module-particletools.analyze" title="Permalink to this heading"></a></h2>
 <p>Functions to analyze a particle based trajectory.</p>
 <dl class="py function">
+<dt class="sig sig-object py" id="particletools.analyze.calc_S">
+<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">calc_S</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">q_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r_arr</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rdf</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rho0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.calc_S" title="Permalink to this definition"></a></dt>
+<dd><p>Calculate the structure factor from the radial distribution function. See
+page 73 of Allen and Tildesley (2nd edition) for more.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>q_arr</strong> – A 1D numpy array of scattering length values to use in
+calculating the structure factor.</p></li>
+<li><p><strong>r_arr</strong> – A 1D numpy array of radius values used in calculating the rdf.</p></li>
+<li><p><strong>rdf</strong> – The radial distribution function for a frame of a simulation
+stored as a 1D numpy array with dimension radius (matches r_arr).</p></li>
+<li><p><strong>rho0</strong> – The bulk density for the particles used in calculating the rdf
+stored as a float.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The structure factor stored as a 1D numpy array with dimension
+scattering length (matches q_arr).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="particletools.analyze.calc_msd">
+<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">calc_msd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">traj_unwrap</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.calc_msd" title="Permalink to this definition"></a></dt>
+<dd><p>Count the number of particles separated by a vector rij for each frame. rij
+is equal to the position vector of particle j minus the position vector of
+particle i.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>traj_unwrap</strong> – The unwrapped trajectory of each particle stored as a 3D
+numpy array with dimensions ‘frame (ascending order) by
+particle ID (ascending order) by particle position
+(x, y, z)’.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The mean-squared displacement of an unwrapped trajectory stored as a 1D
+numpy array with dimension frame (ascending order).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="particletools.analyze.calc_rdf">
+<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">calc_rdf</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r_arr</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.calc_rdf" title="Permalink to this definition"></a></dt>
+<dd><p>Calculate the radial distribution function for a frame of a simulation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pos</strong> – The position of each particle stored as a 2D numpy array with
+dimensions ‘particle ID (ascending order) by particle position
+(x, y, z)’.</p></li>
+<li><p><strong>box_config</strong> – The simulation box configuration stored as a 1D numpy array
+of length 6 with the first three elements being box length
+(lx, ly, lz) and the last three being tilt factors
+(xy, xz, yz)’.</p></li>
+<li><p><strong>r_arr</strong> – A 1D numpy array of radius values to use in calculating the rdf.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The radial distribution function for a frame of a simulation stored as
+a 1D numpy array with dimension radius (matches r_arr).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="particletools.analyze.calc_rg">
+<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">calc_rg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.calc_rg" title="Permalink to this definition"></a></dt>
+<dd><p>Calculate the radius of gyration for a molecule. The radius of gyration is
+the mass-averaged distance between the particles of a molecule and the
+molecule’s center of mass.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pos</strong> – The position of each particle stored as a 2D numpy array with
+dimensions ‘particle ID (ascending order) by particle position
+(x, y, z)’.</p></li>
+<li><p><strong>mass</strong> – The mass of each particle stored as a 1D numpy array with
+dimension ‘particle ID (ascending order)’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The radius of gyration of the molecule stored as a float.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="particletools.analyze.calc_rgt">
+<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">calc_rgt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.calc_rgt" title="Permalink to this definition"></a></dt>
+<dd><p>Calculate the radius of gyration tensor for a molecule. The radius of
+gyration tensor is a 3 by 3 matrix that describes the shape of a molecule.
+Each element is effectively a squared radius of gyration calculation in 1
+dimension or a convolution of 2 dimensions. When diagonlized, the radius of
+gyration tensor returns the squared radius of gyration through a sum of the
+diagonal elements.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pos</strong> – The position of each particle stored as a 2D numpy array with
+dimensions ‘particle ID (ascending order) by particle position
+(x, y, z)’.</p></li>
+<li><p><strong>mass</strong> – The mass of each particle stored as a 1D numpy array with
+dimension ‘particle ID (ascending order)’.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The radius of gyration tensor of a molecule stored as a 2D numpy array
+with dimensions 1st axis (x, y, z) by 2nd axis (x, y, z).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="particletools.analyze.center_traj">
+<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">center_traj</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">traj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">molid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'SYSTEM'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccut</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">350</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.center_traj" title="Permalink to this definition"></a></dt>
+<dd><p>Center a trajectory along a given axis using the given method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>traj</strong> – The trajectory of each particle stored as a 3D numpy array with
+dimensions ‘frame (ascending order) by particle ID (ascending
+order) by particle position (x, y, z)’.</p></li>
+<li><p><strong>molid</strong> – The molecule ID of each particle stored as a 1D numpy array with
+dimension ‘particle ID (ascending order)’.</p></li>
+<li><p><strong>mass</strong> – The mass of each particle stored as a 1D numpy array with
+dimension ‘particle ID (ascending order)’.</p></li>
+<li><p><strong>box_config</strong> – The simulation box configuration stored as a 1D numpy array
+of length 6 with the first three elements being box length
+(lx, ly, lz) and the last three being tilt factors
+(xy, xz, yz)’.</p></li>
+<li><p><strong>axis</strong> – The axis along which to center the trajectory.</p></li>
+<li><p><strong>method</strong> – The centering method used when calculating the density profile.
+Method can have values of ‘SYSTEM’ (all particle positions are
+shifted so that the entire system’s center of mass is at the
+center of the chosen axis) or ‘SLAB’ (all particle positions
+are shifted so that the largest cluster of particles’ center of
+mass is at the center of the chosen axis).</p></li>
+<li><p><strong>ccut</strong> – The cluster cutoff used for determining clusters in the ‘SLAB’
+centering method. For computational tractability, molecules are
+clustered together instead of particles, and ccut is the maximum
+distance a molecule can be from the closest molecule in the same
+cluster.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The centered trajectory of each particle stored as a 3D numpy array
+with dimensions ‘frame (ascending order) by particle ID (ascending
+order) by particle position (x, y, z)’.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="particletools.analyze.density_from_frame">
 <span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">density_from_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">molid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">box_config</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">selection</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bin_axis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">nbins</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">centering</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'NONE'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ccut</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">350</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.density_from_frame" title="Permalink to this definition"></a></dt>
 <dd><p>Calculate the density profile of the selected particles along a given axis
@@ -128,16 +284,9 @@ cluster.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The density profile of the selected particles along a</dt><dd><p>given axis stored as a 2D numpy array with dimensions
-‘bin index by bin properties (position along the axis,
-density at that position).</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>density_profile</p>
+<dd class="field-even"><p>The density profile of the selected particles along a given axis stored
+as a 2D numpy array with dimensions ‘bin index by bin properties
+(position along the axis, density at that position).</p>
 </dd>
 </dl>
 </dd></dl>
@@ -185,17 +334,10 @@ cluster.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The density profile of the selected particles</dt><dd><p>along a given axis per frame stored as a 3D numpy
-array with dimensions ‘frame (ascending order) by
-bin index by bin properties (position along the
-axis, density at that position)’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>traj_density_profile</p>
+<dd class="field-even"><p>The density profile of the selected particles along a given axis per
+frame stored as a 3D numpy array with dimensions ‘frame (ascending
+order) by bin index by bin properties (position along the axis, density
+at that position)’.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -224,16 +366,10 @@ of length 6 with the first three elements being box length
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The image flags of the particles across the trajectory</dt><dd><p>stored as a 3D numpy array with dimensions ‘frame (ascending
+<dd class="field-even"><p>The image flags of the particles across the trajectory
+stored as a 3D numpy array with dimensions ‘frame (ascending
 order) by particle ID (ascending order) by particle image
 flag (ix, iy, iz)’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>img_flags</p>
 </dd>
 </dl>
 </dd></dl>
@@ -256,15 +392,8 @@ dimension ‘z-index’.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The gridpoint values of each axis in the 3D mesh stored as a 4D</dt><dd><p>numpy array with dimension ‘axis (x, y, z) by x-index by y-index
-by z-index’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>grid</p>
+<dd class="field-even"><p>The gridpoint values of each axis in the 3D mesh stored as a 4D numpy
+array with dimension ‘axis (x, y, z) by x-index by y-index by z-index’.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -287,17 +416,11 @@ dimension ‘particle ID (ascending order)’.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The center of mass of each molecule stored as a 2D numpy array</dt><dd><p>with dimensions ‘molecule ID (ascending order) by molecule
-center of mass (x, y, z)’.</p>
-</dd>
-<dt>mol_mass: The mass of each molecule stored as a 1D numpy array with</dt><dd><p>dimension ‘molecule ID (asecnding order)’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>mol_com</p>
+<dd class="field-even"><p>A tuple where the first element is the center of mass of each molecule
+stored as a 2D numpy array with dimensions ‘molecule ID (ascending
+order) by molecule center of mass (x, y, z)’. The second element is the
+mass of each molecule stored as a 1D numpy array with dimension
+‘molecule ID (asecnding order)’.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -319,88 +442,12 @@ dimension ‘particle ID (ascending order)’.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The center of mass of each molecule for every frame</dt><dd><p>stored as a 2D numpy array with dimensions ‘frame
-(ascending order) by molecule ID (ascending order) by
-molecule center of mass (x, y, z)’.</p>
-</dd>
-<dt>mol_mass: The mass of each molecule stored as a 1D numpy array with</dt><dd><p>dimension ‘molecule ID (asecnding order)’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>traj_mol_com</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="particletools.analyze.rg_from_frame">
-<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">rg_from_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pos</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">molid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mol_com</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.rg_from_frame" title="Permalink to this definition"></a></dt>
-<dd><p>Calculate the radius of gyration of each molecule for a single frame of
-their trajectory. The radius of gyration is the average distance between
-the particles of a molecule and the molecule’s center of mass.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pos</strong> – The position of each particle stored as a 2D numpy array with
-dimensions ‘particle ID (ascending order) by particle position
-(x, y, z)’.</p></li>
-<li><p><strong>molid</strong> – The molecule ID of each particle stored as a 1D numpy array with
-dimension ‘particle ID (ascending order)’.</p></li>
-<li><p><strong>mass</strong> – The mass of each particle stored as a 1D numpy array with
-dimension ‘particle ID (ascending order)’.</p></li>
-<li><p><strong>mol_com</strong> – The center of mass of each molecule stored as a 2D numpy array
-with dimensions ‘molecule ID (ascending order) by molecule
-center of mass (x, y, z)’.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The radius of gyration of each molecule stored as a 1D numpy array</dt><dd><p>with dimension ‘molecule ID (ascending order)’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>rg</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="particletools.analyze.rg_from_traj">
-<span class="sig-prename descclassname"><span class="pre">particletools.analyze.</span></span><span class="sig-name descname"><span class="pre">rg_from_traj</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">traj</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">molid</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">traj_mol_com</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#particletools.analyze.rg_from_traj" title="Permalink to this definition"></a></dt>
-<dd><p>Calculate the radius of gyration of each molecule for every frame. The
-radius of gyration is the average distance between the particles of a
-molecule and the molecule’s center of mass.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>traj</strong> – The trajectory of each particle stored as a 3D numpy array with
-dimensions ‘frame (ascending order) by particle ID (ascending
-order) by particle position (x, y, z)’.</p></li>
-<li><p><strong>molid</strong> – The molecule ID of each particle stored as a 1D numpy array with
-dimension ‘particle ID (ascending order)’.</p></li>
-<li><p><strong>mass</strong> – The mass of each particle stored as a 1D numpy array with
-dimension ‘particle ID (ascending order)’.</p></li>
-<li><p><strong>traj_mol_com</strong> – The center of mass of each molecule for every frame
-stored as a 3D numpy array with dimensions ‘frame
-(ascending order) by molecule ID (ascending order) by
-molecule center of mass (x, y, z)’.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The radius of gyration of each molecule for every frame stored</dt><dd><p>as a 2D numpy array with dimensions ‘frame (ascending order)
-by molecule ID (ascending order)’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>traj_rg</p>
+<dd class="field-even"><p>A tuple where the first element is the center of mass of each molecule
+for every frame stored as a 2D numpy array with dimensions ‘frame
+(ascending order) by molecule ID (ascending order) by molecule center
+of mass (x, y, z)’. The second element is the mass of each molecule
+stored as a 1D numpy array with dimension ‘molecule ID (asecnding
+order)’.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -431,16 +478,10 @@ box length.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The number of particles separated by a vector rij stored as a</dt><dd><p>3D numpy array with dimensions ‘x-index by y-index by z-index’,
-where these indices are the indices of the rij vector placed on
-the 3D mesh defined by rijgrid.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>rijcnt</p>
+<dd class="field-even"><p>The number of particles separated by a vector rij stored as a 3D numpy
+array with dimensions ‘x-index by y-index by z-index’, where these
+indices are the indices of the rij vector placed on the 3D mesh defined
+by rijgrid.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -471,17 +512,10 @@ box length.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The number of particles separated by a vector rij per</dt><dd><p>frame stored as a 4D numpy array with dimensions ‘frame
-(ascending order) by x-index by y-index by z-index’, where
-these indices are the indices of the rij vector placed on
-the 3D mesh defined by rijgrid.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>traj_rijcnt</p>
+<dd class="field-even"><p>The number of particles separated by a vector rij per frame stored as a
+4D numpy array with dimensions ‘frame (ascending order) by x-index by
+y-index by z-index’, where these indices are the indices of the rij
+vector placed on the 3D mesh defined by rijgrid.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -509,16 +543,10 @@ flag (ix, iy, iz)’.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>The unwrapped trajectory of each particle stored as a 3D</dt><dd><p>numpy array with dimensions ‘frame (ascending order) by
+<dd class="field-even"><p>The unwrapped trajectory of each particle stored as a 3D
+numpy array with dimensions ‘frame (ascending order) by
 particle ID (ascending order) by particle position
 (x, y, z)’.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>traj_unwrap</p>
 </dd>
 </dl>
 </dd></dl>
