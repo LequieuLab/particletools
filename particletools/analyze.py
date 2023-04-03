@@ -286,6 +286,141 @@ def calc_rg(pos, mass):
 
 
 @jit(nopython=True)
+def center_traj(traj, molid, mass, box_config, axis, method='SYSTEM', 
+                ccut=350):
+    """
+    Center a trajectory along a given axis using the given method.
+    
+    Args:
+
+        traj: The trajectory of each particle stored as a 3D numpy array with
+              dimensions 'frame (ascending order) by particle ID (ascending 
+              order) by particle position (x, y, z)'.
+
+        molid: The molecule ID of each particle stored as a 1D numpy array with
+               dimension 'particle ID (ascending order)'.
+
+        mass: The mass of each particle stored as a 1D numpy array with
+              dimension 'particle ID (ascending order)'.
+
+        box_config: The simulation box configuration stored as a 1D numpy array
+                    of length 6 with the first three elements being box length
+                    (lx, ly, lz) and the last three being tilt factors 
+                    (xy, xz, yz)'.
+
+        axis: The axis along which to center the trajectory.
+
+        method: The centering method used when calculating the density profile.
+                Method can have values of 'SYSTEM' (all particle positions are
+                shifted so that the entire system's center of mass is at the 
+                center of the chosen axis) or 'SLAB' (all particle positions 
+                are shifted so that the largest cluster of particles' center of
+                mass is at the center of the chosen axis).
+
+        ccut: The cluster cutoff used for determining clusters in the 'SLAB'
+              centering method. For computational tractability, molecules are 
+              clustered together instead of particles, and ccut is the maximum
+              distance a molecule can be from the closest molecule in the same
+              cluster.
+
+    Returns:
+
+        traj_centered: The centered trajectory of each particle stored as a 3D 
+                       numpy array with dimensions 'frame (ascending order) by 
+                       particle ID (ascending order) by particle position (x, 
+                       y, z)'.
+    """
+
+    # Preallocate memory for traj_centered and the offset to apply.
+
+    traj_centered = np.zeros(traj.shape)
+    offset = np.zeros(3)
+
+    # Loop through each frame.
+
+    for frame in range(traj.shape[0]): 
+        offset.fill(0)
+        pos = traj[frame]
+    
+        # If the centering method is 'SYSTEM', then calculate the entire 
+        # system's center of mass and set it as the offset.
+
+        if method == 'SYSTEM':
+            wt_pos = (pos.T * mass).T
+            offset = np.sum(wt_pos, axis=0) / np.sum(mass)
+
+        # If the centering method is 'SLAB', then calculate the center of mass 
+        # of the largest cluster (referred to as the slab) and set it as the 
+        # offset.
+        
+        if method == 'SLAB':
+
+            # Get the center of mass and mass of each molecule.
+
+            mol_com, mol_mass = mol_com_from_frame(pos, molid, mass)
+
+            # Create a contact map of the molecules, which details whether a
+            # molecule is within the contact cutoff (ccut) of other molecules.
+
+            nmol = np.unique(molid).shape[0]
+            contact_map = np.zeros((nmol, nmol))
+            for i in range(nmol):                           
+                mol_i_pos = mol_com[i]                     
+                for j in range(i, nmol):                                                
+                    if i == j:
+                        contact_map[i, j] += 1  # Contact of a mol with itself.
+                        continue
+                    mol_j_pos = mol_com[j]
+                    dr = mol_i_pos - mol_j_pos
+                    dist = sqrt(np.dot(dr, dr))
+                    if dist <= ccut:                        
+                        contact_map[i, j] += 1
+                        contact_map[j, i] += 1
+
+            # Compress the contact map by combining rows with shared contacts. 
+            # This causes each row to represent a unique cluster.
+            
+            for row in range(contact_map.shape[0]):
+                new_contacts = True
+                while new_contacts:
+                    new_contacts = False
+                    for col in range(contact_map.shape[1]):
+                        if row == col:  # Skip contacts of a mol with itself.
+                            continue
+                        if (contact_map[row, col] != 0 and
+                            np.any(contact_map[col])):  # Contact non-zero row.
+                            new_contacts = True
+                            contact_map[row] += contact_map[col]
+                            contact_map[col].fill(0)
+
+            # From the compressed contact map, find the largest cluster (i.e. 
+            # the slab) and set the offset to the slab's center of mass.
+
+            cluster_sizes = np.count_nonzero(contact_map, axis=1)
+            slab = np.argmax(cluster_sizes)
+            slab_mols = np.nonzero(contact_map[slab])
+            wt_mol_com = (mol_com.T * mol_mass).T
+            offset = np.sum(wt_mol_com[slab_mols], axis=0) /\
+                     np.sum(mol_mass[slab_mols])
+
+        # Apply the offset to the trajectory and apply the periodic boundary
+        # condition.
+
+        for i in range(pos.shape[0]):
+            pos_centered = pos[i, axis] - offset[axis]
+            if pos_centered >= box_config[axis] / 2:
+                pos_centered -= box_config[axis]
+            if pos_centered < box_config[axis] / -2:
+                pos_centered += box_config[axis]
+            traj_centered[frame, i] = pos[i]
+            traj_centered[frame, i, axis] = pos_centered
+
+    # Return the centered trajectory.
+
+    return traj_centered
+
+
+@jit(nopython=True)
 def density_from_frame(pos, molid, mass, box_config, selection, bin_axis, 
                        nbins, centering='NONE', ccut=350):
     """
