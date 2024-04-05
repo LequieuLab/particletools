@@ -1105,8 +1105,8 @@ def mol_rg_from_frame(pos, molid, mass):
 
     Returns:
 
-        The Rg of each molecule stored as a 1D numpy ayyay with dimensions
-        'molecule ID (ascending order)
+        The Rg of each molecule stored as a 1D numpy array with dimensions
+        'molecule ID (ascending order)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -1114,8 +1114,7 @@ def mol_rg_from_frame(pos, molid, mass):
     mols = np.unique(molid)
     molrg = np.zeros(mols.shape[0])
 
-    # Loop through each molecule, find the corresponding particle indices, and
-    # then calculate the center of mass of the molecule.
+    # Loop through each molecule and calculate its radius of gryation.
 
     for mol in mols:
         indices = np.where(molid == mol)
@@ -1124,11 +1123,9 @@ def mol_rg_from_frame(pos, molid, mass):
         mol_pos = pos[indices]
         molrg[mol_idx] = calc_rg(mol_pos, mol_mass)
     
-    # Return the molecules' radius of gyration
+    # Return the molecules' radii of gyration.
 
     return molrg
-
-
 
 @jit(nopython=True)
 def mol_rg_from_traj(traj, molid, mass):
@@ -1151,7 +1148,7 @@ def mol_rg_from_traj(traj, molid, mass):
 
         The radius of gyration of each molecule for every frame stored as a 
         2D numpy array with dimensions 'frame (ascending order) by molecule ID 
-        (ascending order) 
+        (ascending order)'.
     """
 
     # Get simulation parameters from the arguments and preallocate arrays.
@@ -1160,16 +1157,13 @@ def mol_rg_from_traj(traj, molid, mass):
     nmols = np.unique(molid).shape[0]
     traj_mol_rg = np.zeros((nframes, nmols))
 
-    # Loop through each frame and get the raduis of gyration of each molecule.
+    # Loop through each frame and get the radius of gyration of each molecule.
 
     for frame in range(nframes):
         mol_rg  = mol_rg_from_frame(traj[frame], molid, mass)
         traj_mol_rg[frame] = mol_rg
 
-    # Return the molecules' radius of gyration over the trajectory
+    # Return the molecules' radii of gyration over the trajectory.
 
     return traj_mol_rg
-
-
-
 
